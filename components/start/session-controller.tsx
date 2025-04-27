@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { formatDateTime } from "@/lib/utils/date-formatter"
 import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
@@ -58,6 +59,16 @@ export function SessionController() {
 
     fetchActiveSession()
   }, [router, toast, supabase])
+
+  const toggleSession = async (checked: boolean) => {
+    if (checked) {
+      // Start session
+      await startSession()
+    } else {
+      // End session
+      await endSession()
+    }
+  }
 
   const startSession = async () => {
     setLoading(true)
@@ -128,20 +139,18 @@ export function SessionController() {
 
   return (
     <div className="flex items-center gap-4">
-      {activeSession ? (
-        <>
-          <div className="text-sm">
-            <span className="text-muted-foreground">Active since: </span>
-            <span className="font-medium">{formatDateTime(activeSession.start_time)}</span>
-          </div>
-          <Button onClick={endSession} variant="destructive" size="sm" disabled={loading}>
-            End Session
-          </Button>
-        </>
-      ) : (
-        <Button onClick={startSession} variant="default" size="sm" disabled={loading}>
-          Start Session
-        </Button>
+      <div className="flex items-center space-x-2">
+        <Switch id="session-toggle" checked={!!activeSession} onCheckedChange={toggleSession} disabled={loading} />
+        <Label htmlFor="session-toggle" className="cursor-pointer">
+          {activeSession ? "Session Active" : "Session Inactive"}
+        </Label>
+      </div>
+
+      {activeSession && (
+        <div className="text-sm">
+          <span className="text-muted-foreground">Since: </span>
+          <span className="font-medium">{formatDateTime(activeSession.start_time)}</span>
+        </div>
       )}
     </div>
   )
