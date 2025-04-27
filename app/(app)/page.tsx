@@ -2,6 +2,8 @@ import { getSupabaseServerClient } from "@/lib/supabase/server"
 import { SessionController } from "@/components/start/session-controller"
 import { GameForm } from "@/components/start/game-form"
 import { ActiveGamesList } from "@/components/start/active-games-list"
+// Import the debug component
+import { ProfileDebug } from "@/components/debug/profile-debug"
 
 export default async function StartPage() {
   const supabase = getSupabaseServerClient()
@@ -39,6 +41,8 @@ export default async function StartPage() {
           <p className="text-muted-foreground mt-2">Start a session to begin tracking your games</p>
         </div>
       )}
+      {/* Debug component */}
+      <ProfileDebug />
     </div>
   )
 }

@@ -30,6 +30,7 @@ export function SessionController() {
           return
         }
 
+        // Now fetch the active session
         const { data, error } = await supabase
           .from("sessions")
           .select("id, start_time, end_time")
@@ -37,18 +38,17 @@ export function SessionController() {
           .is("end_time", null)
           .order("start_time", { ascending: false })
           .limit(1)
-          .single()
 
-        if (error && error.code !== "PGRST116") {
+        if (error) {
           throw error
         }
 
-        setActiveSession(data || null)
+        setActiveSession(data && data.length > 0 ? data[0] : null)
       } catch (error: any) {
         console.error("Error fetching active session:", error)
         toast({
           title: "Error",
-          description: "Failed to fetch active session.",
+          description: "Failed to fetch active session: " + error.message,
           variant: "destructive",
         })
       } finally {
@@ -68,15 +68,17 @@ export function SessionController() {
         return
       }
 
+      // Create session
       const { data, error } = await supabase
         .from("sessions")
         .insert([{ user_id: userData.user.id }])
         .select()
-        .single()
 
-      if (error) throw error
+      if (error) {
+        throw new Error("Failed to create session: " + error.message)
+      }
 
-      setActiveSession(data)
+      setActiveSession(data && data.length > 0 ? data[0] : null)
       toast({
         title: "Success",
         description: "Session started successfully.",
@@ -86,7 +88,7 @@ export function SessionController() {
       console.error("Error starting session:", error)
       toast({
         title: "Error",
-        description: "Failed to start session.",
+        description: error.message || "Failed to start session.",
         variant: "destructive",
       })
     } finally {
