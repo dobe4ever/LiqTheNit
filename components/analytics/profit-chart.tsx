@@ -10,17 +10,10 @@ import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-
-interface Game {
-  id: string
-  start_stack: number
-  end_stack: number
-  start_time: string
-  end_time: string
-}
+import { gamesTable } from "@/lib/supabase/tables"
 
 export function ProfitChart() {
-  const [games, setGames] = useState<Game[]>([])
+  const [games, setGames] = useState<gamesTable[]>([])
   const [btcPrice, setBtcPrice] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("7")

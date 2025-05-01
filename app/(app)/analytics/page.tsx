@@ -4,17 +4,23 @@ import { HoursChart } from "@/components/analytics/hours-chart"
 
 export default function AnalyticsPage() {
   return (
-    <div className="space-y-6">
+    // Main wrapper
+    <div className="flex flex-col pb-10 sm:flex-row justify-between gap-4">
+
+      {/* Row 1: Title + subline */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
         <p className="text-muted-foreground">Track your performance over time</p>
       </div>
 
-      <div className="space-y-6">
-        <PerformanceChart />
-        <ProfitChart />
-        <HoursChart />
-      </div>
+      {/* Row 2: Performance chart */}
+      <PerformanceChart />
+
+      {/* Row 3: Profits chart */}
+      <ProfitChart />
+
+      {/* Row 4: Time played chart */}
+      <HoursChart />
     </div>
   )
 }

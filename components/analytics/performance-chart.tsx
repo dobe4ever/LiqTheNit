@@ -11,14 +11,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { getHoursDifference } from "@/lib/utils/date-formatter"
-
-interface Game {
-  id: string
-  start_stack: number
-  end_stack: number
-  start_time: string
-  end_time: string
-}
+import { gamesTable } from "@/lib/supabase/tables"
 
 type TimeframeOption = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "5Y" | "ALL"
 
@@ -40,7 +33,7 @@ const timeframeConfigs: Record<TimeframeOption, TimeframeConfig> = {
 }
 
 export function PerformanceChart() {
-  const [games, setGames] = useState<Game[]>([])
+  const [games, setGames] = useState<gamesTable[]>([])
   const [btcPrice, setBtcPrice] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [timeframe, setTimeframe] = useState<TimeframeOption>("7D")

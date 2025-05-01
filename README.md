@@ -44,26 +44,31 @@ for file in \
 'app/(auth)/auth/page.tsx' \
 app/layout.tsx \
 components/analytics/hours-chart.tsx \
-components/analytics/profit-chart.tsx \
 components/analytics/performance-chart.tsx \
+components/analytics/profit-chart.tsx \
 components/auth/auth-form.tsx \
+components/history/bitcoin-price-display.tsx \
 components/history/games-table.tsx \
 components/history/week-stats.tsx \
 components/layout/navbar.tsx \
+components/layout/switch-theme.tsx \
 components/start/active-games-list.tsx \
 components/start/game-form.tsx \
 components/start/session-controller.tsx \
-components.json \
+components/nav-user.tsx \
+components/theme-provider.tsx \
 lib/services/bitcoin-price.ts \
 lib/supabase/admin.ts \
 lib/supabase/client.ts \
 lib/supabase/server.ts \
 lib/utils/date-formatter.ts \
-lib/utils/number-formatter.ts 
+lib/utils/number-formatter.ts \
+lib/utils.ts
 do
-  echo -e "\n\n### $file"
+  echo -e "\n### $file"
   echo '```ts'
   cat "$file"
+  echo ''
   echo '```'
 done
 ) > codebase.md

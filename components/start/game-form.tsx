@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,45 +11,92 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
-// Interface updated: onGameCreated removed
-interface GameFormProps {
-  sessionId: string
-}
-
-// Parameters updated: onGameCreated removed
-export function GameForm({ sessionId }: GameFormProps) {
+// Removed sessionId from props
+export function GameForm() {
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(true)
   const [gameType, setGameType] = useState<string>("regular")
   const [buyIn, setBuyIn] = useState<string>("100")
   const [startStack, setStartStack] = useState<string>("")
-  const [loading, setLoading] = useState(false)
+  const [formLoading, setFormLoading] = useState(false) // Renamed loading state
   const router = useRouter()
   const { toast } = useToast()
   const supabase = getSupabaseBrowserClient()
 
+  // Fetch active session ID
+  useEffect(() => {
+    const fetchActiveSession = async () => {
+      setSessionLoading(true)
+      try {
+        const { data: userData } = await supabase.auth.getUser()
+        if (!userData.user) {
+          // No need to push to /auth, layout should handle this
+          setSessionLoading(false)
+          return
+        }
+
+        const { data, error } = await supabase
+          .from("sessions")
+          .select("id")
+          .eq("user_id", userData.user.id)
+          .is("end_time", null)
+          .order("start_time", { ascending: false })
+          .maybeSingle()
+
+        if (error) throw error
+
+        setActiveSessionId(data?.id ?? null)
+      } catch (error: any) {
+        console.error("Error fetching active session for game form:", error)
+        toast({
+          title: "Error",
+          description: "Could not determine active session.",
+          variant: "destructive",
+        })
+        setActiveSessionId(null)
+      } finally {
+        setSessionLoading(false)
+      }
+    }
+
+    fetchActiveSession()
+    // Add listener for auth changes which might affect session status indirectly
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+      // Re-fetch session when auth state changes (e.g., logout)
+      fetchActiveSession()
+    })
+
+    // Cleanup listener on component unmount
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [supabase, toast])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-
-    if (!startStack) {
-      toast({
-        title: "Error",
-        description: "Please enter a starting stack value.",
-        variant: "destructive",
-      })
-      setLoading(false)
+    if (!activeSessionId) {
+      toast({ title: "Error", description: "No active session found.", variant: "destructive" })
       return
     }
+    if (!startStack) {
+      toast({ title: "Error", description: "Please enter a starting stack value.", variant: "destructive" })
+      return
+    }
+
+    setFormLoading(true) // Use formLoading state
 
     try {
       const { data: userData } = await supabase.auth.getUser()
       if (!userData.user) {
-        router.push("/auth")
+        router.push("/auth") // Redirect if user somehow lost auth
         return
       }
 
       const { error } = await supabase.from("games").insert([
         {
-          session_id: sessionId,
+          session_id: activeSessionId, // Use fetched session ID
           user_id: userData.user.id,
           game_type: gameType,
           buy_in: Number.parseInt(buyIn),
@@ -61,26 +107,50 @@ export function GameForm({ sessionId }: GameFormProps) {
 
       if (error) throw error
 
-      toast({
-        title: "Success",
-        description: "Game started successfully.",
-      })
-
+      toast({ title: "Success", description: "Game started successfully." })
       setStartStack("")
-      // onGameCreated() call removed (wasn't strictly needed before either)
-      router.refresh() // This handles updating the UI/data
+      router.refresh() // Refresh page to update ActiveGamesList
     } catch (error: any) {
       console.error("Error starting game:", error)
-      toast({
-        title: "Error",
-        description: "Failed to start game.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Failed to start game.", variant: "destructive" })
     } finally {
-      setLoading(false)
+      setFormLoading(false) // Use formLoading state
     }
   }
 
+  // Render loading state or message if no active session
+  if (sessionLoading) {
+    return (
+      <Card className="animate-pulse">
+        <CardHeader>
+          <div className="h-6 bg-muted rounded w-3/4 mb-4"></div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="h-10 bg-muted rounded"></div>
+          <div className="h-10 bg-muted rounded"></div>
+          <div className="h-10 bg-muted rounded"></div>
+        </CardContent>
+        <CardFooter>
+          <div className="h-10 bg-muted rounded w-full"></div>
+        </CardFooter>
+      </Card>
+    )
+  }
+
+  if (!activeSessionId) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Start New Game</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">Start a session to add new games.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Render the form if session is active
   return (
     <Card>
       <CardHeader>
@@ -90,7 +160,7 @@ export function GameForm({ sessionId }: GameFormProps) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="game-type">Game Type</Label>
-            <Select value={gameType} onValueChange={setGameType} disabled={loading}>
+            <Select value={gameType} onValueChange={setGameType} disabled={formLoading}>
               <SelectTrigger id="game-type">
                 <SelectValue placeholder="Select game type" />
               </SelectTrigger>
@@ -103,7 +173,7 @@ export function GameForm({ sessionId }: GameFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="buy-in">Buy In (µBTC)</Label>
-            <Select value={buyIn} onValueChange={setBuyIn} disabled={loading}>
+            <Select value={buyIn} onValueChange={setBuyIn} disabled={formLoading}>
               <SelectTrigger id="buy-in">
                 <SelectValue placeholder="Select buy in amount" />
               </SelectTrigger>
@@ -123,14 +193,14 @@ export function GameForm({ sessionId }: GameFormProps) {
               value={startStack}
               onChange={(e) => setStartStack(e.target.value)}
               placeholder="Enter starting stack"
-              disabled={loading}
+              disabled={formLoading}
               required
             />
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Starting..." : "Start Game"}
+          <Button type="submit" className="w-full" disabled={formLoading}>
+            {formLoading ? "Starting..." : "Start Game"}
           </Button>
         </CardFooter>
       </form>

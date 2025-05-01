@@ -9,15 +9,10 @@ import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getHoursDifference } from "@/lib/utils/date-formatter"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-
-interface Game {
-  id: string
-  start_time: string
-  end_time: string
-}
+import { gamesTable } from "@/lib/supabase/tables"
 
 export function HoursChart() {
-  const [games, setGames] = useState<Game[]>([])
+  const [games, setGames] = useState<gamesTable[]>([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("7")
   const router = useRouter()

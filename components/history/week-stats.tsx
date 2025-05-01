@@ -105,7 +105,8 @@ export function WeekStats() {
   // --- Render Logic ---
   return (
     <>
-      <div className="flex justify-end mb-2">
+      <div className="flex justify-between mb-2">
+        <h2 className="text-xl font-semibold">This Week So Far</h2>
         {/* --- Refresh Button --- */}
         <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
