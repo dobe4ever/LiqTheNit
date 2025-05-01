@@ -18,7 +18,7 @@ export default async function StartPage() {
     .maybeSingle()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
       <div className="flex flex-col sm:flex-row justify-between gap-4 items-start">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Start</h1>
@@ -30,8 +30,10 @@ export default async function StartPage() {
 
       {activeSession ? (
         <div className="grid gap-6 lg:grid-cols-2">
-          <GameForm sessionId={activeSession.id} onGameCreated={() => {}} />
-          <ActiveGamesList sessionId={activeSession.id} onUpdate={() => {}} />
+          {/* Prop 'onGameCreated' removed */}
+          <GameForm sessionId={activeSession.id} />
+          {/* Prop 'onUpdate' removed */}
+          <ActiveGamesList sessionId={activeSession.id} />
         </div>
       ) : (
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 text-center">

@@ -28,3 +28,44 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+
+# Command to generate codebase dump:
+
+```
+(
+echo "# Codebase Dump"
+for file in \
+'app/(app)/analytics/page.tsx' \
+'app/(app)/history/page.tsx' \
+'app/(app)/layout.tsx' \
+'app/(app)/page.tsx' \
+'app/(auth)/auth/callback/route.ts' \
+'app/(auth)/auth/page.tsx' \
+app/layout.tsx \
+components/analytics/hours-chart.tsx \
+components/analytics/profit-chart.tsx \
+components/analytics/performance-chart.tsx \
+components/auth/auth-form.tsx \
+components/history/games-table.tsx \
+components/history/week-stats.tsx \
+components/layout/navbar.tsx \
+components/start/active-games-list.tsx \
+components/start/game-form.tsx \
+components/start/session-controller.tsx \
+components.json \
+lib/services/bitcoin-price.ts \
+lib/supabase/admin.ts \
+lib/supabase/client.ts \
+lib/supabase/server.ts \
+lib/utils/date-formatter.ts \
+lib/utils/number-formatter.ts 
+do
+  echo -e "\n\n### $file"
+  echo '```ts'
+  cat "$file"
+  echo '```'
+done
+) > codebase.md
+
+```

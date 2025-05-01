@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import { LogoSymbol } from "@/components/logo-symbol"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -104,12 +104,19 @@ export function AuthForm() {
 
   return (
     <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl text-center">LiqTheNit</CardTitle>
-        <CardDescription className="text-center">Track your OFC poker progress</CardDescription>
+      <CardHeader className="flex flex-col items-center">
+        <div>
+          <LogoSymbol className="h-12 w-9" />
+        </div>
+        <CardTitle className="text-2xl font-bold text-center">
+          NIT
+        </CardTitle>
+        <CardDescription className="text-center">
+          Track your OFC poker progress
+        </CardDescription>
       </CardHeader>
       <Tabs defaultValue="signin">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="mx-6 grid w- grid-cols-2">
           <TabsTrigger value="signin">Sign In</TabsTrigger>
           <TabsTrigger value="signup">Sign Up</TabsTrigger>
         </TabsList>

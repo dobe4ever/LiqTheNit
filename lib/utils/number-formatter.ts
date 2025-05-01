@@ -8,7 +8,7 @@ export function formatMoney(amount: number, currency = "USD"): string {
 }
 
 export function formatUBTC(amount: number): string {
-  return `${amount} µBTC`
+  return `${amount} µ`
 }
 
 export function convertUBTCtoUSD(uBTC: number, btcPriceInUSD: number): number {

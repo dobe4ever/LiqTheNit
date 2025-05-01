@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
+// Interface updated: onGameCreated removed
 interface GameFormProps {
   sessionId: string
-  onGameCreated: () => void
 }
 
-export function GameForm({ sessionId, onGameCreated }: GameFormProps) {
+// Parameters updated: onGameCreated removed
+export function GameForm({ sessionId }: GameFormProps) {
   const [gameType, setGameType] = useState<string>("regular")
   const [buyIn, setBuyIn] = useState<string>("100")
   const [startStack, setStartStack] = useState<string>("")
@@ -66,8 +67,8 @@ export function GameForm({ sessionId, onGameCreated }: GameFormProps) {
       })
 
       setStartStack("")
-      onGameCreated()
-      router.refresh()
+      // onGameCreated() call removed (wasn't strictly needed before either)
+      router.refresh() // This handles updating the UI/data
     } catch (error: any) {
       console.error("Error starting game:", error)
       toast({

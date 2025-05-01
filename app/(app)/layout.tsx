@@ -37,10 +37,14 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-screen flex-col pb-16 sm:pb-0">
-      <Navbar />
-      <main className="flex-1 p-4 md:p-6 mt-0 sm:mt-16">
-        <div className="container mx-auto max-w-7xl">{children}</div>
+    <div className="flex min-h-screen flex-col m-2">
+      <div>
+        <Navbar />
+      </div>
+      <main className="flex-1 p-2 md:p-6 mt-0 sm:mt-0">
+        <div className="container mx-auto max-w-7xl">
+          {children}
+        </div>
       </main>
     </div>
   )

@@ -1,7 +1,9 @@
+// components/start/active-games-list.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react" // Import useCallback
 import { useRouter } from "next/navigation"
+import { RefreshCw } from "lucide-react" // Import RefreshCw
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -24,10 +26,9 @@ interface Game {
 
 interface ActiveGamesListProps {
   sessionId: string
-  onUpdate: () => void
 }
 
-export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
+export function ActiveGamesList({ sessionId }: ActiveGamesListProps) {
   const [games, setGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
   const [endingGame, setEndingGame] = useState<string | null>(null)
@@ -37,47 +38,49 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
   const { toast } = useToast()
   const supabase = getSupabaseBrowserClient()
 
-  useEffect(() => {
-    const fetchGames = async () => {
-      setLoading(true)
-      try {
-        const { data: userData } = await supabase.auth.getUser()
-        if (!userData.user) {
-          router.push("/auth")
-          return
-        }
-
-        const [gamesResponse, priceResponse] = await Promise.all([
-          supabase
-            .from("games")
-            .select("*")
-            .eq("session_id", sessionId)
-            .eq("user_id", userData.user.id)
-            .is("end_time", null)
-            .order("start_time", { ascending: false }),
-          getBitcoinPriceInUSD(),
-        ])
-
-        if (gamesResponse.error) throw gamesResponse.error
-
-        setGames(gamesResponse.data || [])
-        setBtcPrice(priceResponse)
-      } catch (error: any) {
-        console.error("Error fetching active games:", error)
-        toast({
-          title: "Error",
-          description: "Failed to fetch active games.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
+  // --- Refactored Fetch Logic ---
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) {
+        router.push("/auth")
+        return
       }
-    }
 
-    if (sessionId) {
-      fetchGames()
+      const [gamesResponse, priceResponse] = await Promise.all([
+        supabase
+          .from("games")
+          .select("*")
+          .eq("session_id", sessionId)
+          .eq("user_id", userData.user.id)
+          .is("end_time", null)
+          .order("start_time", { ascending: false }),
+        getBitcoinPriceInUSD(),
+      ])
+
+      if (gamesResponse.error) throw gamesResponse.error
+
+      setGames(gamesResponse.data || [])
+      setBtcPrice(priceResponse)
+    } catch (error: any) {
+      console.error("Error fetching active games:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch active games.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-  }, [sessionId, router, toast, supabase])
+  }, [sessionId, router, toast, supabase]) // Dependencies for useCallback
+
+  // --- useEffect calls fetchData ---
+  useEffect(() => {
+    if (sessionId) {
+      fetchData()
+    }
+  }, [sessionId, fetchData]) // fetchData is now a dependency
 
   const handleEndGame = (gameId: string) => {
     setEndingGame(gameId)
@@ -88,6 +91,7 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
   }
 
   const submitEndGame = async (gameId: string) => {
+    // ... (keep existing submitEndGame logic)
     if (!endStack) {
       toast({
         title: "Error",
@@ -98,6 +102,7 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
     }
 
     try {
+      setLoading(true) // Indicate loading during submission
       const { error } = await supabase
         .from("games")
         .update({
@@ -115,11 +120,8 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
 
       setEndingGame(null)
       setEndStack("")
-      onUpdate()
-      router.refresh()
-
-      // Refresh the games list
-      setGames(games.filter((g) => g.id !== gameId))
+      router.refresh() // <<< Keep this to refresh the whole page state
+      // No need to call fetchData() here as router.refresh() handles it
     } catch (error: any) {
       console.error("Error ending game:", error)
       toast({
@@ -127,7 +129,10 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
         description: "Failed to end game.",
         variant: "destructive",
       })
+    } finally {
+      setLoading(false)
     }
+    // ...
   }
 
   const cancelEndGame = () => {
@@ -135,40 +140,38 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
     setEndStack("")
   }
 
-  if (loading && games.length === 0) {
-    return (
-      <div className="space-y-4">
+  // --- Render Logic ---
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Current Active Tables</h2>
+        {/* --- Refresh Button --- */}
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          <span className="sr-only">Refresh</span>
+        </Button>
+      </div>
+
+      {loading && games.length === 0 && (
         <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-muted rounded-md"></div>
           <div className="h-24 bg-muted rounded-md"></div>
         </div>
-      </div>
-    )
-  }
+      )}
 
-  if (games.length === 0) {
-    return (
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Current Active Tables</h2>
+      {!loading && games.length === 0 && (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
             No active games. Start a new game to see it here.
           </CardContent>
         </Card>
-      </div>
-    )
-  }
+      )}
 
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Current Active Tables</h2>
       <div className="space-y-4">
         {games.map((game) => {
           const isEnding = endingGame === game.id
-
           return (
             <Card key={game.id}>
+              {/* ... (keep existing card content) ... */}
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
                   <div>
@@ -213,13 +216,14 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
                         onChange={(e) => setEndStack(e.target.value)}
                         placeholder="Enter ending stack"
                         required
+                        disabled={loading} // Disable input while submitting
                       />
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={() => submitEndGame(game.id)} className="flex-1">
-                        Confirm
+                      <Button onClick={() => submitEndGame(game.id)} className="flex-1" disabled={loading}>
+                        {loading ? "Confirming..." : "Confirm"}
                       </Button>
-                      <Button onClick={cancelEndGame} variant="outline" className="flex-1">
+                      <Button onClick={cancelEndGame} variant="outline" className="flex-1" disabled={loading}>
                         Cancel
                       </Button>
                     </div>
@@ -228,7 +232,7 @@ export function ActiveGamesList({ sessionId, onUpdate }: ActiveGamesListProps) {
               </CardContent>
               {!isEnding && (
                 <CardFooter>
-                  <Button onClick={() => handleEndGame(game.id)} variant="default" className="w-full">
+                  <Button onClick={() => handleEndGame(game.id)} variant="default" className="w-full" disabled={loading}>
                     End Game
                   </Button>
                 </CardFooter>

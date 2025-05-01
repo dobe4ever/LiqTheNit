@@ -1,6 +1,6 @@
 import { WeekStats } from "@/components/history/week-stats"
 import { GamesTable } from "@/components/history/games-table"
-import { BitcoinPriceDisplay } from "@/components/ui/bitcoin-price-display"
+import { BitcoinPriceDisplay } from "@/components/history/bitcoin-price-display"
 
 export default function HistoryPage() {
   const today = new Date().toLocaleDateString("en-US", {
@@ -17,7 +17,6 @@ export default function HistoryPage() {
           <h1 className="text-3xl font-bold tracking-tight">History</h1>
           <p className="text-muted-foreground">{today}</p>
         </div>
-
         <BitcoinPriceDisplay />
       </div>
 
