@@ -69,8 +69,8 @@ export default function HistoryPage() {
 import type React from "react"
 import { redirect } from "next/navigation"
 import { Navbar } from "@/components/layout/navbar"
-import { getSupabaseServerClient } from "@/lib/supabase/server"
-import { getSupabaseAdmin } from "@/lib/supabase/admin"
+import { getSupabaseServerClient } from "@/app/supabase/server"
+import { getSupabaseAdmin } from "@/app/supabase/admin"
 
 export default async function AppLayout({
   children,
@@ -99,11 +99,7 @@ export default async function AppLayout({
       ignoreDuplicates: false, // Update the row if it already exists
     },
   )
-
-  if (upsertError) {
-    console.error("Error upserting profile:", upsertError)
-  }
-
+  
   return (
     <div className="flex min-h-screen flex-col m-2">
       <div>
@@ -121,7 +117,6 @@ export default async function AppLayout({
 
 ### app/(app)/page.tsx
 ```ts
-import { SessionController } from "@/components/start/session-controller"
 import { GameForm } from "@/components/start/game-form"
 import { ActiveGamesList } from "@/components/start/active-games-list"
 
@@ -129,26 +124,22 @@ export default async function StartPage() {
   return (
     // Main wrapper
     <div className="flex flex-col pb-10 sm:flex-row justify-between gap-4 w-">
-        
+
       {/* Row 1: Title + subline */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Start</h1>
-        <p className="text-muted-foreground">Start a session and track your games</p>
+        <p className="text-muted-foreground">Track your games</p>
       </div>
 
-      {/* Row 2: session controller */}
-      <SessionController />
-
-      {/* Row 3: Game form */}
+      {/* Row 2: Game form */}
       <GameForm />
 
-      {/* Row 4: Active games */}
+      {/* Row 3: Active games */}
       <ActiveGamesList />
 
     </div>
   )
 }
-
 ```
 
 ### app/(auth)/auth/callback/route.ts
@@ -177,7 +168,7 @@ export async function GET(request: NextRequest) {
 ```ts
 import { redirect } from "next/navigation"
 import { AuthForm } from "@/components/auth/auth-form"
-import { getSupabaseServerClient } from "@/lib/supabase/server"
+import { getSupabaseServerClient } from "@/app/supabase/server"
 
 export default async function AuthPage() {
   const supabase = getSupabaseServerClient()
@@ -192,6 +183,80 @@ export default async function AuthPage() {
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
       <AuthForm />
     </div>
+  )
+}
+```
+
+### app/supabase/admin.ts
+```ts
+import { createClient } from "@supabase/supabase-js"
+
+// Create a Supabase client with the service role key that can bypass RLS
+export function getSupabaseAdmin() {
+  const supabaseUrl = process.env.SUPABASE_URL!
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+```
+
+### app/supabase/client.ts
+```ts
+"use client"
+
+import { createBrowserClient } from "@supabase/ssr"
+
+// Create a single instance of the Supabase client to be used throughout the app
+let supabaseClient: ReturnType<typeof createBrowserClient> | null = null
+
+export function getSupabaseBrowserClient() {
+  if (!supabaseClient) {
+    supabaseClient = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    )
+  }
+  return supabaseClient
+}
+```
+
+### app/supabase/server.ts
+```ts
+// lib/supabase/server.ts
+
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
+import { cookies } from "next/headers"
+
+export function getSupabaseServerClient() {
+  const cookieStore = cookies()
+
+  return createServerClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string): string | undefined {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: CookieOptions): void {
+          try {
+            cookieStore.set({ name, value, ...options })
+          } catch (error) {
+          }
+        },
+        remove(name: string, options: CookieOptions): void {
+          try {
+            cookieStore.set({ name, value: "", ...options })
+          } catch (error) {
+          }
+        },
+      },
+    }
   )
 }
 ```
@@ -244,10 +309,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getHoursDifference } from "@/lib/utils/date-formatter"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { gamesTable } from "@/lib/supabase/tables"
+import { gamesTable } from "@/app/supabase/tables"
 
 export function HoursChart() {
   const [games, setGames] = useState<gamesTable[]>([])
@@ -409,11 +474,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { getHoursDifference } from "@/lib/utils/date-formatter"
-import { gamesTable } from "@/lib/supabase/tables"
+import { gamesTable } from "@/app/supabase/tables"
 
 type TimeframeOption = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "5Y" | "ALL"
 
@@ -762,10 +827,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { gamesTable } from "@/lib/supabase/tables"
+import { gamesTable } from "@/app/supabase/tables"
 
 export function ProfitChart() {
   const [games, setGames] = useState<gamesTable[]>([])
@@ -940,7 +1005,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 
 export function AuthForm() {
   const [email, setEmail] = useState("")
@@ -1220,9 +1285,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDateTime, getHoursDifference } from "@/lib/utils/date-formatter"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
-import { gamesTable } from "@/lib/supabase/tables"
+import { gamesTable } from "@/app/supabase/tables"
 
 export function GamesTable() {
   const [games, setGames] = useState<gamesTable[]>([])
@@ -1379,7 +1444,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatMoney, formatUBTC, convertUBTCtoUSD } from "@/lib/utils/number-formatter"
 import { getStartOfWeek, getHoursDifference } from "@/lib/utils/date-formatter"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 
 // Define the type for the game data fetched specifically in this component
@@ -1561,7 +1626,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { BarChart3, Clock, Play } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { NavUser } from "@/components/nav-user"
 import { LogoSymbol } from "@/components/logo-symbol"
@@ -1768,8 +1833,9 @@ import { Label } from "@/components/ui/label"
 import { formatDateTime, getHoursDifference } from "@/lib/utils/date-formatter"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
+import type { User } from "@supabase/supabase-js" // Import User type
 
 interface Game {
   id: string
@@ -1779,15 +1845,13 @@ interface Game {
   end_stack: number | null
   start_time: string
   end_time: string | null
-  session_id: string // Keep session_id if needed elsewhere, though not used in fetch logic now
+  // session_id removed
 }
 
-// Removed sessionId prop
 export function ActiveGamesList() {
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [sessionLoading, setSessionLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
   const [games, setGames] = useState<Game[]>([])
-  const [listLoading, setListLoading] = useState(true) // Separate loading for the list
+  const [listLoading, setListLoading] = useState(true)
   const [endingGame, setEndingGame] = useState<string | null>(null)
   const [endStack, setEndStack] = useState<string>("")
   const [btcPrice, setBtcPrice] = useState<number>(0)
@@ -1795,74 +1859,46 @@ export function ActiveGamesList() {
   const { toast } = useToast()
   const supabase = getSupabaseBrowserClient()
 
-  // Fetch active session ID
-  const fetchActiveSession = useCallback(async () => {
-    setSessionLoading(true)
-    setActiveSessionId(null) // Reset session ID before fetching
-    setGames([]) // Clear games when session might change
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        setSessionLoading(false)
-        return
-      }
-
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("id")
-        .eq("user_id", userData.user.id)
-        .is("end_time", null)
-        .order("start_time", { ascending: false })
-        .maybeSingle()
-
-      if (error) throw error
-
-      setActiveSessionId(data?.id ?? null)
-    } catch (error: any) {
-      console.error("Error fetching active session for games list:", error)
-      toast({ title: "Error", description: "Could not determine active session.", variant: "destructive" })
-      setActiveSessionId(null)
-    } finally {
-      setSessionLoading(false)
-    }
-  }, [supabase, toast])
-
+  // Fetch user and listen for changes
   useEffect(() => {
-    fetchActiveSession()
-    // Add listener for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      fetchActiveSession()
+    const fetchUser = async () => {
+      setListLoading(true) // Start loading when checking user
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error("Error fetching user:", error)
+        toast({ title: "Error", description: "Failed to get user.", variant: "destructive" })
+        setUser(null)
+      } else {
+        setUser(user)
+      }
+      // Set loading false here or after data fetch? Let's keep it true until data is fetched.
+    }
+    fetchUser()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setUser(user ?? null)
+      // If user changes, we need to re-fetch data, handled by fetchData dependency on 'user'
     })
     return () => {
       subscription?.unsubscribe()
     }
-  }, [fetchActiveSession]) // Depend on the memoized function
+  }, [supabase, toast])
 
-  // Fetch active games based on the activeSessionId
+  // Fetch active games based on user
   const fetchData = useCallback(async () => {
-    if (!activeSessionId) {
-      setGames([]) // Ensure games are cleared if no session ID
-      setListLoading(false)
+    if (!user) {
+      setGames([]) // Clear games if no user
+      setListLoading(false) // Stop loading if no user
       return
     }
 
     setListLoading(true)
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        router.push("/auth") // Should be handled by layout/session fetch, but belt-and-suspenders
-        return
-      }
-
       const [gamesResponse, priceResponse] = await Promise.all([
         supabase
           .from("games")
           .select("*")
-          .eq("session_id", activeSessionId) // Use the fetched activeSessionId
-          .eq("user_id", userData.user.id)
-          .is("end_time", null)
+          .eq("user_id", user.id) // Fetch based on user_id
+          .is("end_time", null) // Only active games
           .order("start_time", { ascending: false }),
         getBitcoinPriceInUSD(),
       ])
@@ -1874,17 +1910,16 @@ export function ActiveGamesList() {
     } catch (error: any) {
       console.error("Error fetching active games:", error)
       toast({ title: "Error", description: "Failed to fetch active games.", variant: "destructive" })
-      setGames([]) // Clear games on error
+      setGames([])
     } finally {
       setListLoading(false)
     }
-    // Removed sessionId dependency, added activeSessionId
-  }, [activeSessionId, router, toast, supabase])
+  }, [user, toast, supabase]) // Depends on user
 
-  // useEffect calls fetchData when activeSessionId changes
+  // useEffect calls fetchData when user changes
   useEffect(() => {
     fetchData()
-  }, [activeSessionId, fetchData]) // Now depends on activeSessionId
+  }, [user, fetchData]) // Fetch data when user state is confirmed/changed
 
   const handleEndGame = (gameId: string) => {
     setEndingGame(gameId)
@@ -1896,11 +1931,11 @@ export function ActiveGamesList() {
 
   const submitEndGame = async (gameId: string) => {
     if (!endStack) {
-      toast({ title: "Error", description: "Please enter an ending stack value.", variant: "destructive" })
+      toast({ title: "Error", description: "Enter ending stack.", variant: "destructive" })
       return
     }
 
-    setListLoading(true) // Indicate loading during submission
+    setListLoading(true)
     try {
       const { error } = await supabase
         .from("games")
@@ -1912,19 +1947,16 @@ export function ActiveGamesList() {
 
       if (error) throw error
 
-      toast({ title: "Success", description: "Game ended successfully." })
+      toast({ title: "Success", description: "Game ended." })
       setEndingGame(null)
       setEndStack("")
-      fetchData() // Re-fetch data after ending game
-      router.refresh() // Still good to refresh for other potential updates on the page
+      fetchData() // Re-fetch data
+      router.refresh()
     } catch (error: any) {
       console.error("Error ending game:", error)
       toast({ title: "Error", description: "Failed to end game.", variant: "destructive" })
     } finally {
-      // Ensure loading state is reset even if fetchData is called
-      // Note: listLoading might be immediately set to true by fetchData,
-      // but we ensure it's false if the submit logic finishes first.
-      setListLoading(false)
+      // fetchData will set listLoading to false
     }
   }
 
@@ -1933,11 +1965,8 @@ export function ActiveGamesList() {
     setEndStack("")
   }
 
-  // Combined loading state
-  const isLoading = sessionLoading || listLoading
-
-  // Render initial loading state
-  if (sessionLoading) {
+  // Render loading state
+  if (listLoading && games.length === 0) { // Show skeleton only on initial load or when user changes
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -1946,19 +1975,20 @@ export function ActiveGamesList() {
         </div>
         <div className="animate-pulse space-y-4">
           <div className="h-24 bg-muted rounded-md"></div>
+          <div className="h-24 bg-muted rounded-md"></div>
         </div>
       </div>
     )
   }
 
-  // Render message if no active session
-  if (!activeSessionId) {
+  // Render message if no user or no active games
+  if (!user || (!listLoading && games.length === 0)) {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Current Active Tables</h2>
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
-            No active session. Start a session to see active games.
+            { !user ? "Log in to see active games." : "No active games. Start one above!" }
           </CardContent>
         </Card>
       </div>
@@ -1970,25 +2000,11 @@ export function ActiveGamesList() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Current Active Tables</h2>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={listLoading}>
+          <RefreshCw className={`h-4 w-4 ${listLoading ? "animate-spin" : ""}`} />
           <span className="sr-only">Refresh</span>
         </Button>
       </div>
-
-      {listLoading && games.length === 0 && (
-        <div className="animate-pulse space-y-4">
-          <div className="h-24 bg-muted rounded-md"></div>
-        </div>
-      )}
-
-      {!listLoading && games.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            No active games in this session. Start a new game to see it here.
-          </CardContent>
-        </Card>
-      )}
 
       <div className="space-y-4">
         {games.map((game) => {
@@ -1999,7 +2015,7 @@ export function ActiveGamesList() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="capitalize">{game.game_type} Game</CardTitle>
-                    <CardDescription>Started at {formatDateTime(game.start_time)}</CardDescription>
+                    <CardDescription>Started {formatDateTime(game.start_time)}</CardDescription>
                   </div>
                   <div className="text-right">
                     <div className="font-semibold">{formatUBTC(game.buy_in)}</div>
@@ -2012,7 +2028,7 @@ export function ActiveGamesList() {
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Starting Stack:</span>
+                    <span className="text-muted-foreground">Start Stack:</span>
                     <div>
                       <span className="font-medium">{formatUBTC(game.start_stack)}</span>
                       <div className="text-sm text-muted-foreground">
@@ -2021,9 +2037,9 @@ export function ActiveGamesList() {
                     </div>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Running Time:</span>
+                    <span className="text-muted-foreground">Time:</span>
                     <span className="font-medium">
-                      {getHoursDifference(game.start_time, new Date().toISOString()).toFixed(2)} hours
+                      {getHoursDifference(game.start_time, new Date().toISOString()).toFixed(2)} h
                     </span>
                   </div>
                 </div>
@@ -2031,7 +2047,7 @@ export function ActiveGamesList() {
                 {isEnding && (
                   <div className="mt-4 space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor={`end-stack-${game.id}`}>Ending Stack (µBTC)</Label>
+                      <Label htmlFor={`end-stack-${game.id}`}>End Stack (µBTC)</Label>
                       <Input
                         id={`end-stack-${game.id}`}
                         type="number"
@@ -2039,12 +2055,12 @@ export function ActiveGamesList() {
                         onChange={(e) => setEndStack(e.target.value)}
                         placeholder="Enter ending stack"
                         required
-                        disabled={listLoading} // Disable input while submitting
+                        disabled={listLoading}
                       />
                     </div>
                     <div className="flex gap-2">
                       <Button onClick={() => submitEndGame(game.id)} className="flex-1" disabled={listLoading}>
-                        {listLoading ? "Confirming..." : "Confirm"}
+                        {listLoading ? "Confirm..." : "Confirm"}
                       </Button>
                       <Button onClick={cancelEndGame} variant="outline" className="flex-1" disabled={listLoading}>
                         Cancel
@@ -2082,95 +2098,49 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 
-// Removed sessionId from props
 export function GameForm() {
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [sessionLoading, setSessionLoading] = useState(true)
   const [gameType, setGameType] = useState<string>("regular")
   const [buyIn, setBuyIn] = useState<string>("100")
   const [startStack, setStartStack] = useState<string>("")
-  const [formLoading, setFormLoading] = useState(false) // Renamed loading state
+  const [formLoading, setFormLoading] = useState(false)
+  const [isUser, setIsUser] = useState(false) // Track auth state
   const router = useRouter()
   const { toast } = useToast()
   const supabase = getSupabaseBrowserClient()
 
-  // Fetch active session ID
+  // Check auth state
   useEffect(() => {
-    const fetchActiveSession = async () => {
-      setSessionLoading(true)
-      try {
-        const { data: userData } = await supabase.auth.getUser()
-        if (!userData.user) {
-          // No need to push to /auth, layout should handle this
-          setSessionLoading(false)
-          return
-        }
-
-        const { data, error } = await supabase
-          .from("sessions")
-          .select("id")
-          .eq("user_id", userData.user.id)
-          .is("end_time", null)
-          .order("start_time", { ascending: false })
-          .maybeSingle()
-
-        if (error) throw error
-
-        setActiveSessionId(data?.id ?? null)
-      } catch (error: any) {
-        console.error("Error fetching active session for game form:", error)
-        toast({
-          title: "Error",
-          description: "Could not determine active session.",
-          variant: "destructive",
-        })
-        setActiveSessionId(null)
-      } finally {
-        setSessionLoading(false)
-      }
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setIsUser(!!user)
     }
+    checkUser()
 
-    fetchActiveSession()
-    // Add listener for auth changes which might affect session status indirectly
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      // Re-fetch session when auth state changes (e.g., logout)
-      fetchActiveSession()
-    })
-
-    // Cleanup listener on component unmount
-    return () => {
-      subscription?.unsubscribe()
-    }
-  }, [supabase, toast])
+  }, [supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeSessionId) {
-      toast({ title: "Error", description: "No active session found.", variant: "destructive" })
+    if (!isUser) {
+      toast({ title: "Error", description: "You must be logged in.", variant: "destructive" })
       return
     }
     if (!startStack) {
-      toast({ title: "Error", description: "Please enter a starting stack value.", variant: "destructive" })
+      toast({ title: "Error", description: "Enter starting stack.", variant: "destructive" })
       return
     }
 
-    setFormLoading(true) // Use formLoading state
+    setFormLoading(true)
 
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        router.push("/auth") // Redirect if user somehow lost auth
-        return
-      }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("User not found") // Should not happen if isUser is true
 
       const { error } = await supabase.from("games").insert([
         {
-          session_id: activeSessionId, // Use fetched session ID
-          user_id: userData.user.id,
+          // session_id removed
+          user_id: user.id,
           game_type: gameType,
           buy_in: Number.parseInt(buyIn),
           start_stack: Number.parseInt(startStack),
@@ -2180,50 +2150,32 @@ export function GameForm() {
 
       if (error) throw error
 
-      toast({ title: "Success", description: "Game started successfully." })
+      toast({ title: "Success", description: "Game started." })
       setStartStack("")
-      router.refresh() // Refresh page to update ActiveGamesList
+      router.refresh()
     } catch (error: any) {
       console.error("Error starting game:", error)
       toast({ title: "Error", description: "Failed to start game.", variant: "destructive" })
     } finally {
-      setFormLoading(false) // Use formLoading state
+      setFormLoading(false)
     }
   }
 
-  // Render loading state or message if no active session
-  if (sessionLoading) {
-    return (
-      <Card className="animate-pulse">
-        <CardHeader>
-          <div className="h-6 bg-muted rounded w-3/4 mb-4"></div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="h-10 bg-muted rounded"></div>
-          <div className="h-10 bg-muted rounded"></div>
-          <div className="h-10 bg-muted rounded"></div>
-        </CardContent>
-        <CardFooter>
-          <div className="h-10 bg-muted rounded w-full"></div>
-        </CardFooter>
-      </Card>
-    )
-  }
-
-  if (!activeSessionId) {
+  // Render message if not logged in
+  if (!isUser) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Start New Game</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Start a session to add new games.</p>
+          <p className="text-muted-foreground">Log in to start a game.</p>
         </CardContent>
       </Card>
     )
   }
 
-  // Render the form if session is active
+  // Render the form if logged in
   return (
     <Card>
       <CardHeader>
@@ -2282,164 +2234,20 @@ export function GameForm() {
 }
 ```
 
-### components/start/session-controller.tsx
+### components/logo-symbol.tsx
 ```ts
-"use client"
+import * as React from 'react'; 
+type ImageProps = React.ComponentPropsWithoutRef<'img'>;
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { formatDateTime } from "@/lib/utils/date-formatter"
-import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-
-interface Session {
-  id: string
-  start_time: string
-  end_time: string | null
-}
-
-export function SessionController() {
-  const [activeSession, setActiveSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
-  const { toast } = useToast()
-  const supabase = getSupabaseBrowserClient()
-
-  useEffect(() => {
-    const fetchActiveSession = async () => {
-      setLoading(true)
-      try {
-        const { data: userData } = await supabase.auth.getUser()
-        if (!userData.user) {
-          router.push("/auth")
-          return
-        }
-
-        // Now fetch the active session
-        const { data, error } = await supabase
-          .from("sessions")
-          .select("id, start_time, end_time")
-          .eq("user_id", userData.user.id)
-          .is("end_time", null)
-          .order("start_time", { ascending: false })
-          .limit(1)
-
-        if (error) {
-          throw error
-        }
-
-        setActiveSession(data && data.length > 0 ? data[0] : null)
-      } catch (error: any) {
-        console.error("Error fetching active session:", error)
-        toast({
-          title: "Error",
-          description: "Failed to fetch active session: " + error.message,
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchActiveSession()
-  }, [router, toast, supabase])
-
-  const toggleSession = async (checked: boolean) => {
-    if (checked) {
-      // Start session
-      await startSession()
-    } else {
-      // End session
-      await endSession()
-    }
-  }
-
-  const startSession = async () => {
-    setLoading(true)
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        router.push("/auth")
-        return
-      }
-
-      // Create session
-      const { data, error } = await supabase
-        .from("sessions")
-        .insert([{ user_id: userData.user.id }])
-        .select()
-
-      if (error) {
-        throw new Error("Failed to create session: " + error.message)
-      }
-
-      setActiveSession(data && data.length > 0 ? data[0] : null)
-      toast({
-        title: "Success",
-        description: "Session started successfully.",
-      })
-      router.refresh()
-    } catch (error: any) {
-      console.error("Error starting session:", error)
-      toast({
-        title: "Error",
-        description: error.message || "Failed to start session.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const endSession = async () => {
-    if (!activeSession) return
-
-    setLoading(true)
-    try {
-      const { error } = await supabase
-        .from("sessions")
-        .update({ end_time: new Date().toISOString() })
-        .eq("id", activeSession.id)
-
-      if (error) throw error
-
-      setActiveSession(null)
-      toast({
-        title: "Success",
-        description: "Session ended successfully.",
-      })
-      router.refresh()
-    } catch (error: any) {
-      console.error("Error ending session:", error)
-      toast({
-        title: "Error",
-        description: "Failed to end session.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
+export function LogoSymbol(props: ImageProps) {
   return (
-    <div className="flex items-center gap-4">
-      <div className="flex items-center space-x-2">
-        <Switch id="session-toggle" checked={!!activeSession} onCheckedChange={toggleSession} disabled={loading} />
-        <Label htmlFor="session-toggle" className="cursor-pointer">
-          {activeSession ? "Session Active" : "Session Inactive"}
-        </Label>
-      </div>
-
-      {activeSession && (
-        <div className="text-sm">
-          <span className="text-muted-foreground">Since: </span>
-          <span className="font-medium">{formatDateTime(activeSession.start_time)}</span>
-        </div>
-      )}
-    </div>
-  )
+    <img
+      src="/logo_symbol.png" // Path relative to the public folder
+      alt="LiqTheNit Logo Symbol" // Descriptive alt text
+      // Spread props to allow className, style, width, height etc.
+      {...props}
+    />
+  );
 }
 ```
 
@@ -2564,6 +2372,229 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 ```
 
+### hooks/use-mobile.tsx
+```ts
+import * as React from "react"
+
+const MOBILE_BREAKPOINT = 768
+
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const onChange = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+    mql.addEventListener("change", onChange)
+    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+
+  return !!isMobile
+}
+
+```
+
+### hooks/use-toast.ts
+```ts
+"use client"
+
+// Inspired by react-hot-toast library
+import * as React from "react"
+
+import type {
+  ToastActionElement,
+  ToastProps,
+} from "@/components/ui/toast"
+
+const TOAST_LIMIT = 1
+const TOAST_REMOVE_DELAY = 1000000
+
+type ToasterToast = ToastProps & {
+  id: string
+  title?: React.ReactNode
+  description?: React.ReactNode
+  action?: ToastActionElement
+}
+
+const actionTypes = {
+  ADD_TOAST: "ADD_TOAST",
+  UPDATE_TOAST: "UPDATE_TOAST",
+  DISMISS_TOAST: "DISMISS_TOAST",
+  REMOVE_TOAST: "REMOVE_TOAST",
+} as const
+
+let count = 0
+
+function genId() {
+  count = (count + 1) % Number.MAX_SAFE_INTEGER
+  return count.toString()
+}
+
+type ActionType = typeof actionTypes
+
+type Action =
+  | {
+      type: ActionType["ADD_TOAST"]
+      toast: ToasterToast
+    }
+  | {
+      type: ActionType["UPDATE_TOAST"]
+      toast: Partial<ToasterToast>
+    }
+  | {
+      type: ActionType["DISMISS_TOAST"]
+      toastId?: ToasterToast["id"]
+    }
+  | {
+      type: ActionType["REMOVE_TOAST"]
+      toastId?: ToasterToast["id"]
+    }
+
+interface State {
+  toasts: ToasterToast[]
+}
+
+const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+
+const addToRemoveQueue = (toastId: string) => {
+  if (toastTimeouts.has(toastId)) {
+    return
+  }
+
+  const timeout = setTimeout(() => {
+    toastTimeouts.delete(toastId)
+    dispatch({
+      type: "REMOVE_TOAST",
+      toastId: toastId,
+    })
+  }, TOAST_REMOVE_DELAY)
+
+  toastTimeouts.set(toastId, timeout)
+}
+
+export const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case "ADD_TOAST":
+      return {
+        ...state,
+        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+      }
+
+    case "UPDATE_TOAST":
+      return {
+        ...state,
+        toasts: state.toasts.map((t) =>
+          t.id === action.toast.id ? { ...t, ...action.toast } : t
+        ),
+      }
+
+    case "DISMISS_TOAST": {
+      const { toastId } = action
+
+      // ! Side effects ! - This could be extracted into a dismissToast() action,
+      // but I'll keep it here for simplicity
+      if (toastId) {
+        addToRemoveQueue(toastId)
+      } else {
+        state.toasts.forEach((toast) => {
+          addToRemoveQueue(toast.id)
+        })
+      }
+
+      return {
+        ...state,
+        toasts: state.toasts.map((t) =>
+          t.id === toastId || toastId === undefined
+            ? {
+                ...t,
+                open: false,
+              }
+            : t
+        ),
+      }
+    }
+    case "REMOVE_TOAST":
+      if (action.toastId === undefined) {
+        return {
+          ...state,
+          toasts: [],
+        }
+      }
+      return {
+        ...state,
+        toasts: state.toasts.filter((t) => t.id !== action.toastId),
+      }
+  }
+}
+
+const listeners: Array<(state: State) => void> = []
+
+let memoryState: State = { toasts: [] }
+
+function dispatch(action: Action) {
+  memoryState = reducer(memoryState, action)
+  listeners.forEach((listener) => {
+    listener(memoryState)
+  })
+}
+
+type Toast = Omit<ToasterToast, "id">
+
+function toast({ ...props }: Toast) {
+  const id = genId()
+
+  const update = (props: ToasterToast) =>
+    dispatch({
+      type: "UPDATE_TOAST",
+      toast: { ...props, id },
+    })
+  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+
+  dispatch({
+    type: "ADD_TOAST",
+    toast: {
+      ...props,
+      id,
+      open: true,
+      onOpenChange: (open) => {
+        if (!open) dismiss()
+      },
+    },
+  })
+
+  return {
+    id: id,
+    dismiss,
+    update,
+  }
+}
+
+function useToast() {
+  const [state, setState] = React.useState<State>(memoryState)
+
+  React.useEffect(() => {
+    listeners.push(setState)
+    return () => {
+      const index = listeners.indexOf(setState)
+      if (index > -1) {
+        listeners.splice(index, 1)
+      }
+    }
+  }, [state])
+
+  return {
+    ...state,
+    toast,
+    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+  }
+}
+
+export { useToast, toast }
+
+```
+
 ### lib/services/bitcoin-price.ts
 ```ts
 "use server"
@@ -2587,80 +2618,6 @@ export async function getBitcoinPriceInUSD(): Promise<number> {
   }
 }
 
-```
-
-### lib/supabase/admin.ts
-```ts
-import { createClient } from "@supabase/supabase-js"
-
-// Create a Supabase client with the service role key that can bypass RLS
-export function getSupabaseAdmin() {
-  const supabaseUrl = process.env.SUPABASE_URL!
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
-```
-
-### lib/supabase/client.ts
-```ts
-"use client"
-
-import { createBrowserClient } from "@supabase/ssr"
-
-// Create a single instance of the Supabase client to be used throughout the app
-let supabaseClient: ReturnType<typeof createBrowserClient> | null = null
-
-export function getSupabaseBrowserClient() {
-  if (!supabaseClient) {
-    supabaseClient = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    )
-  }
-  return supabaseClient
-}
-```
-
-### lib/supabase/server.ts
-```ts
-// lib/supabase/server.ts
-
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
-import { cookies } from "next/headers"
-
-export function getSupabaseServerClient() {
-  const cookieStore = cookies()
-
-  return createServerClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string): string | undefined {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions): void {
-          try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {
-          }
-        },
-        remove(name: string, options: CookieOptions): void {
-          try {
-            cookieStore.set({ name, value: "", ...options })
-          } catch (error) {
-          }
-        },
-      },
-    }
-  )
-}
 ```
 
 ### lib/utils/date-formatter.ts
@@ -2752,4 +2709,61 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+```
+
+### next.config.mjs
+```ts
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  images: {
+    unoptimized: true,
+  },
+  // ++ Add this section ++
+  experimental: {
+    serverActions: {
+      // Replace with your specific Codespace URL including the protocol (https://)
+      allowedOrigins: ["localhost:3000", "vigilant-space-cod-xjxvgx4jrvrfpwrr-3000.app.github.dev/"],
+    },
+  },
+  // ++ End of added section ++
+}
+
+export default nextConfig
+```
+
+### tsconfig.json
+```ts
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "target": "ES6",
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
 ```

@@ -13,7 +13,7 @@ const nextConfig = {
   experimental: {
     serverActions: {
       // Replace with your specific Codespace URL including the protocol (https://)
-      allowedOrigins: ["localhost:3000", "vigilant-space-cod-xjxvgx4jrvrfpwrr-3000.app.github.dev/"],
+      allowedOrigins: ["localhost:3000", "jubilant-lamp-5w5x759wqr5hv4jx.github.dev"],
     },
   },
   // ++ End of added section ++
