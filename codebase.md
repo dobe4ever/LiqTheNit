@@ -247,15 +247,10 @@ import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getHoursDifference } from "@/lib/utils/date-formatter"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-
-interface Game {
-  id: string
-  start_time: string
-  end_time: string
-}
+import { gamesTable } from "@/lib/supabase/tables"
 
 export function HoursChart() {
-  const [games, setGames] = useState<Game[]>([])
+  const [games, setGames] = useState<gamesTable[]>([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("7")
   const router = useRouter()
@@ -418,14 +413,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { getHoursDifference } from "@/lib/utils/date-formatter"
-
-interface Game {
-  id: string
-  start_stack: number
-  end_stack: number
-  start_time: string
-  end_time: string
-}
+import { gamesTable } from "@/lib/supabase/tables"
 
 type TimeframeOption = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "5Y" | "ALL"
 
@@ -447,7 +435,7 @@ const timeframeConfigs: Record<TimeframeOption, TimeframeConfig> = {
 }
 
 export function PerformanceChart() {
-  const [games, setGames] = useState<Game[]>([])
+  const [games, setGames] = useState<gamesTable[]>([])
   const [btcPrice, setBtcPrice] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [timeframe, setTimeframe] = useState<TimeframeOption>("7D")
@@ -777,17 +765,10 @@ import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-
-interface Game {
-  id: string
-  start_stack: number
-  end_stack: number
-  start_time: string
-  end_time: string
-}
+import { gamesTable } from "@/lib/supabase/tables"
 
 export function ProfitChart() {
-  const [games, setGames] = useState<Game[]>([])
+  const [games, setGames] = useState<gamesTable[]>([])
   const [btcPrice, setBtcPrice] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("7")
@@ -1230,9 +1211,9 @@ export function BitcoinPriceDisplay() {
 // components/history/games-table.tsx
 "use client"
 
-import { useState, useEffect, useCallback } from "react" // Import useCallback
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { RefreshCw } from "lucide-react" // Import RefreshCw
+import { RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -1241,19 +1222,10 @@ import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-fo
 import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
-
-interface Game {
-  id: string
-  game_type: string
-  buy_in: number
-  start_stack: number
-  end_stack: number
-  start_time: string
-  end_time: string
-}
+import { gamesTable } from "@/lib/supabase/tables"
 
 export function GamesTable() {
-  const [games, setGames] = useState<Game[]>([])
+  const [games, setGames] = useState<gamesTable[]>([])
   const [btcPrice, setBtcPrice] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
@@ -1263,7 +1235,6 @@ export function GamesTable() {
   const { toast } = useToast()
   const supabase = getSupabaseBrowserClient()
 
-  // --- Refactored Fetch Logic ---
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
@@ -1302,39 +1273,23 @@ export function GamesTable() {
 
       setGames(gamesResponse.data || [])
       setBtcPrice(priceResponse)
-    } catch (error: any) {
+    } 
+    catch (error: any) {
       console.error("Error fetching games:", error)
       toast({
         title: "Error",
         description: "Failed to fetch games history.",
         variant: "destructive",
       })
-      // Reset pagination on error maybe?
-      // setPage(0);
-      // setTotalGames(0);
     } finally {
       setLoading(false)
     }
-  }, [page, router, toast, supabase]) // Dependencies for useCallback (page included)
-
-  // --- useEffect calls fetchData ---
+  }, [page, router, toast, supabase])
+  
   useEffect(() => {
     fetchData()
-  }, [page, fetchData]) // page is still a primary trigger
-
-  const handleNextPage = () => {
-    if ((page + 1) * pageSize < totalGames) {
-      setPage(page + 1) // This change triggers useEffect via page dependency
-    }
-  }
-
-  const handlePrevPage = () => {
-    if (page > 0) {
-      setPage(page - 1) // This change triggers useEffect via page dependency
-    }
-  }
-
-  // --- Render Logic ---
+  }, [page, fetchData])
+  
   return (
     <Card>
       <div className="flex justify-between p-2 border-b">
@@ -1404,33 +1359,6 @@ export function GamesTable() {
               </TableBody>
             </Table>
           </div>
-
-          {/* Pagination */}
-          {totalGames > pageSize && (
-            <div className="flex items-center justify-between px-4 py-2 border-t">
-              <div className="text-sm text-muted-foreground">
-                Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, totalGames)} of {totalGames}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrevPage}
-                  disabled={page === 0 || loading} // Disable pagination during load
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNextPage}
-                  disabled={(page + 1) * pageSize >= totalGames || loading} // Disable pagination during load
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
         </>
       )}
     </Card>

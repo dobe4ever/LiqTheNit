@@ -7,11 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { getHoursDifference } from "@/lib/utils/date-formatter"
-import { gamesTable } from "@/lib/supabase/tables"
+import { gamesTable } from "@/app/supabase/tables"
 
 type TimeframeOption = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "5Y" | "ALL"
 

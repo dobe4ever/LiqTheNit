@@ -9,95 +9,49 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 
-// Removed sessionId from props
 export function GameForm() {
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [sessionLoading, setSessionLoading] = useState(true)
   const [gameType, setGameType] = useState<string>("regular")
   const [buyIn, setBuyIn] = useState<string>("100")
   const [startStack, setStartStack] = useState<string>("")
-  const [formLoading, setFormLoading] = useState(false) // Renamed loading state
+  const [formLoading, setFormLoading] = useState(false)
+  const [isUser, setIsUser] = useState(false) // Track auth state
   const router = useRouter()
   const { toast } = useToast()
   const supabase = getSupabaseBrowserClient()
 
-  // Fetch active session ID
+  // Check auth state
   useEffect(() => {
-    const fetchActiveSession = async () => {
-      setSessionLoading(true)
-      try {
-        const { data: userData } = await supabase.auth.getUser()
-        if (!userData.user) {
-          // No need to push to /auth, layout should handle this
-          setSessionLoading(false)
-          return
-        }
-
-        const { data, error } = await supabase
-          .from("sessions")
-          .select("id")
-          .eq("user_id", userData.user.id)
-          .is("end_time", null)
-          .order("start_time", { ascending: false })
-          .maybeSingle()
-
-        if (error) throw error
-
-        setActiveSessionId(data?.id ?? null)
-      } catch (error: any) {
-        console.error("Error fetching active session for game form:", error)
-        toast({
-          title: "Error",
-          description: "Could not determine active session.",
-          variant: "destructive",
-        })
-        setActiveSessionId(null)
-      } finally {
-        setSessionLoading(false)
-      }
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setIsUser(!!user)
     }
+    checkUser()
 
-    fetchActiveSession()
-    // Add listener for auth changes which might affect session status indirectly
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      // Re-fetch session when auth state changes (e.g., logout)
-      fetchActiveSession()
-    })
-
-    // Cleanup listener on component unmount
-    return () => {
-      subscription?.unsubscribe()
-    }
-  }, [supabase, toast])
+  }, [supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!activeSessionId) {
-      toast({ title: "Error", description: "No active session found.", variant: "destructive" })
+    if (!isUser) {
+      toast({ title: "Error", description: "You must be logged in.", variant: "destructive" })
       return
     }
     if (!startStack) {
-      toast({ title: "Error", description: "Please enter a starting stack value.", variant: "destructive" })
+      toast({ title: "Error", description: "Enter starting stack.", variant: "destructive" })
       return
     }
 
-    setFormLoading(true) // Use formLoading state
+    setFormLoading(true)
 
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        router.push("/auth") // Redirect if user somehow lost auth
-        return
-      }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error("User not found") // Should not happen if isUser is true
 
       const { error } = await supabase.from("games").insert([
         {
-          session_id: activeSessionId, // Use fetched session ID
-          user_id: userData.user.id,
+          // session_id removed
+          user_id: user.id,
           game_type: gameType,
           buy_in: Number.parseInt(buyIn),
           start_stack: Number.parseInt(startStack),
@@ -107,50 +61,32 @@ export function GameForm() {
 
       if (error) throw error
 
-      toast({ title: "Success", description: "Game started successfully." })
+      toast({ title: "Success", description: "Game started." })
       setStartStack("")
-      router.refresh() // Refresh page to update ActiveGamesList
+      router.refresh()
     } catch (error: any) {
       console.error("Error starting game:", error)
       toast({ title: "Error", description: "Failed to start game.", variant: "destructive" })
     } finally {
-      setFormLoading(false) // Use formLoading state
+      setFormLoading(false)
     }
   }
 
-  // Render loading state or message if no active session
-  if (sessionLoading) {
-    return (
-      <Card className="animate-pulse">
-        <CardHeader>
-          <div className="h-6 bg-muted rounded w-3/4 mb-4"></div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="h-10 bg-muted rounded"></div>
-          <div className="h-10 bg-muted rounded"></div>
-          <div className="h-10 bg-muted rounded"></div>
-        </CardContent>
-        <CardFooter>
-          <div className="h-10 bg-muted rounded w-full"></div>
-        </CardFooter>
-      </Card>
-    )
-  }
-
-  if (!activeSessionId) {
+  // Render message if not logged in
+  if (!isUser) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Start New Game</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Start a session to add new games.</p>
+          <p className="text-muted-foreground">Log in to start a game.</p>
         </CardContent>
       </Card>
     )
   }
 
-  // Render the form if session is active
+  // Render the form if logged in
   return (
     <Card>
       <CardHeader>

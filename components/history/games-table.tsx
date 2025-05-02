@@ -10,9 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDateTime, getHoursDifference } from "@/lib/utils/date-formatter"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
-import { gamesTable } from "@/lib/supabase/tables"
+import { gamesTable } from "@/app/supabase/tables"
 
 export function GamesTable() {
   const [games, setGames] = useState<gamesTable[]>([])

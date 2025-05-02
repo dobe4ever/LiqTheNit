@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatMoney, formatUBTC, convertUBTCtoUSD } from "@/lib/utils/number-formatter"
 import { getStartOfWeek, getHoursDifference } from "@/lib/utils/date-formatter"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
 
 // Define the type for the game data fetched specifically in this component

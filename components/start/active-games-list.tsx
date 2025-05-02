@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label"
 import { formatDateTime, getHoursDifference } from "@/lib/utils/date-formatter"
 import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getSupabaseBrowserClient } from "@/app/supabase/client"
 import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
+import type { User } from "@supabase/supabase-js" // Import User type
 
 interface Game {
   id: string
@@ -21,15 +22,13 @@ interface Game {
   end_stack: number | null
   start_time: string
   end_time: string | null
-  session_id: string // Keep session_id if needed elsewhere, though not used in fetch logic now
+  // session_id removed
 }
 
-// Removed sessionId prop
 export function ActiveGamesList() {
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [sessionLoading, setSessionLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
   const [games, setGames] = useState<Game[]>([])
-  const [listLoading, setListLoading] = useState(true) // Separate loading for the list
+  const [listLoading, setListLoading] = useState(true)
   const [endingGame, setEndingGame] = useState<string | null>(null)
   const [endStack, setEndStack] = useState<string>("")
   const [btcPrice, setBtcPrice] = useState<number>(0)
@@ -37,74 +36,46 @@ export function ActiveGamesList() {
   const { toast } = useToast()
   const supabase = getSupabaseBrowserClient()
 
-  // Fetch active session ID
-  const fetchActiveSession = useCallback(async () => {
-    setSessionLoading(true)
-    setActiveSessionId(null) // Reset session ID before fetching
-    setGames([]) // Clear games when session might change
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        setSessionLoading(false)
-        return
-      }
-
-      const { data, error } = await supabase
-        .from("sessions")
-        .select("id")
-        .eq("user_id", userData.user.id)
-        .is("end_time", null)
-        .order("start_time", { ascending: false })
-        .maybeSingle()
-
-      if (error) throw error
-
-      setActiveSessionId(data?.id ?? null)
-    } catch (error: any) {
-      console.error("Error fetching active session for games list:", error)
-      toast({ title: "Error", description: "Could not determine active session.", variant: "destructive" })
-      setActiveSessionId(null)
-    } finally {
-      setSessionLoading(false)
-    }
-  }, [supabase, toast])
-
+  // Fetch user and listen for changes
   useEffect(() => {
-    fetchActiveSession()
-    // Add listener for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      fetchActiveSession()
+    const fetchUser = async () => {
+      setListLoading(true) // Start loading when checking user
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error("Error fetching user:", error)
+        toast({ title: "Error", description: "Failed to get user.", variant: "destructive" })
+        setUser(null)
+      } else {
+        setUser(user)
+      }
+      // Set loading false here or after data fetch? Let's keep it true until data is fetched.
+    }
+    fetchUser()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setUser(user ?? null)
+      // If user changes, we need to re-fetch data, handled by fetchData dependency on 'user'
     })
     return () => {
       subscription?.unsubscribe()
     }
-  }, [fetchActiveSession]) // Depend on the memoized function
+  }, [supabase, toast])
 
-  // Fetch active games based on the activeSessionId
+  // Fetch active games based on user
   const fetchData = useCallback(async () => {
-    if (!activeSessionId) {
-      setGames([]) // Ensure games are cleared if no session ID
-      setListLoading(false)
+    if (!user) {
+      setGames([]) // Clear games if no user
+      setListLoading(false) // Stop loading if no user
       return
     }
 
     setListLoading(true)
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        router.push("/auth") // Should be handled by layout/session fetch, but belt-and-suspenders
-        return
-      }
-
       const [gamesResponse, priceResponse] = await Promise.all([
         supabase
           .from("games")
           .select("*")
-          .eq("session_id", activeSessionId) // Use the fetched activeSessionId
-          .eq("user_id", userData.user.id)
-          .is("end_time", null)
+          .eq("user_id", user.id) // Fetch based on user_id
+          .is("end_time", null) // Only active games
           .order("start_time", { ascending: false }),
         getBitcoinPriceInUSD(),
       ])
@@ -116,17 +87,16 @@ export function ActiveGamesList() {
     } catch (error: any) {
       console.error("Error fetching active games:", error)
       toast({ title: "Error", description: "Failed to fetch active games.", variant: "destructive" })
-      setGames([]) // Clear games on error
+      setGames([])
     } finally {
       setListLoading(false)
     }
-    // Removed sessionId dependency, added activeSessionId
-  }, [activeSessionId, router, toast, supabase])
+  }, [user, toast, supabase]) // Depends on user
 
-  // useEffect calls fetchData when activeSessionId changes
+  // useEffect calls fetchData when user changes
   useEffect(() => {
     fetchData()
-  }, [activeSessionId, fetchData]) // Now depends on activeSessionId
+  }, [user, fetchData]) // Fetch data when user state is confirmed/changed
 
   const handleEndGame = (gameId: string) => {
     setEndingGame(gameId)
@@ -138,11 +108,11 @@ export function ActiveGamesList() {
 
   const submitEndGame = async (gameId: string) => {
     if (!endStack) {
-      toast({ title: "Error", description: "Please enter an ending stack value.", variant: "destructive" })
+      toast({ title: "Error", description: "Enter ending stack.", variant: "destructive" })
       return
     }
 
-    setListLoading(true) // Indicate loading during submission
+    setListLoading(true)
     try {
       const { error } = await supabase
         .from("games")
@@ -154,19 +124,16 @@ export function ActiveGamesList() {
 
       if (error) throw error
 
-      toast({ title: "Success", description: "Game ended successfully." })
+      toast({ title: "Success", description: "Game ended." })
       setEndingGame(null)
       setEndStack("")
-      fetchData() // Re-fetch data after ending game
-      router.refresh() // Still good to refresh for other potential updates on the page
+      fetchData() // Re-fetch data
+      router.refresh()
     } catch (error: any) {
       console.error("Error ending game:", error)
       toast({ title: "Error", description: "Failed to end game.", variant: "destructive" })
     } finally {
-      // Ensure loading state is reset even if fetchData is called
-      // Note: listLoading might be immediately set to true by fetchData,
-      // but we ensure it's false if the submit logic finishes first.
-      setListLoading(false)
+      // fetchData will set listLoading to false
     }
   }
 
@@ -175,11 +142,8 @@ export function ActiveGamesList() {
     setEndStack("")
   }
 
-  // Combined loading state
-  const isLoading = sessionLoading || listLoading
-
-  // Render initial loading state
-  if (sessionLoading) {
+  // Render loading state
+  if (listLoading && games.length === 0) { // Show skeleton only on initial load or when user changes
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -188,19 +152,20 @@ export function ActiveGamesList() {
         </div>
         <div className="animate-pulse space-y-4">
           <div className="h-24 bg-muted rounded-md"></div>
+          <div className="h-24 bg-muted rounded-md"></div>
         </div>
       </div>
     )
   }
 
-  // Render message if no active session
-  if (!activeSessionId) {
+  // Render message if no user or no active games
+  if (!user || (!listLoading && games.length === 0)) {
     return (
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Current Active Tables</h2>
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
-            No active session. Start a session to see active games.
+            { !user ? "Log in to see active games." : "No active games. Start one above!" }
           </CardContent>
         </Card>
       </div>
@@ -212,25 +177,11 @@ export function ActiveGamesList() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Current Active Tables</h2>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={listLoading}>
+          <RefreshCw className={`h-4 w-4 ${listLoading ? "animate-spin" : ""}`} />
           <span className="sr-only">Refresh</span>
         </Button>
       </div>
-
-      {listLoading && games.length === 0 && (
-        <div className="animate-pulse space-y-4">
-          <div className="h-24 bg-muted rounded-md"></div>
-        </div>
-      )}
-
-      {!listLoading && games.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            No active games in this session. Start a new game to see it here.
-          </CardContent>
-        </Card>
-      )}
 
       <div className="space-y-4">
         {games.map((game) => {
@@ -241,7 +192,7 @@ export function ActiveGamesList() {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="capitalize">{game.game_type} Game</CardTitle>
-                    <CardDescription>Started at {formatDateTime(game.start_time)}</CardDescription>
+                    <CardDescription>Started {formatDateTime(game.start_time)}</CardDescription>
                   </div>
                   <div className="text-right">
                     <div className="font-semibold">{formatUBTC(game.buy_in)}</div>
@@ -254,7 +205,7 @@ export function ActiveGamesList() {
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Starting Stack:</span>
+                    <span className="text-muted-foreground">Start Stack:</span>
                     <div>
                       <span className="font-medium">{formatUBTC(game.start_stack)}</span>
                       <div className="text-sm text-muted-foreground">
@@ -263,9 +214,9 @@ export function ActiveGamesList() {
                     </div>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Running Time:</span>
+                    <span className="text-muted-foreground">Time:</span>
                     <span className="font-medium">
-                      {getHoursDifference(game.start_time, new Date().toISOString()).toFixed(2)} hours
+                      {getHoursDifference(game.start_time, new Date().toISOString()).toFixed(2)} h
                     </span>
                   </div>
                 </div>
@@ -273,7 +224,7 @@ export function ActiveGamesList() {
                 {isEnding && (
                   <div className="mt-4 space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor={`end-stack-${game.id}`}>Ending Stack (µBTC)</Label>
+                      <Label htmlFor={`end-stack-${game.id}`}>End Stack (µBTC)</Label>
                       <Input
                         id={`end-stack-${game.id}`}
                         type="number"
@@ -281,12 +232,12 @@ export function ActiveGamesList() {
                         onChange={(e) => setEndStack(e.target.value)}
                         placeholder="Enter ending stack"
                         required
-                        disabled={listLoading} // Disable input while submitting
+                        disabled={listLoading}
                       />
                     </div>
                     <div className="flex gap-2">
                       <Button onClick={() => submitEndGame(game.id)} className="flex-1" disabled={listLoading}>
-                        {listLoading ? "Confirming..." : "Confirm"}
+                        {listLoading ? "Confirm..." : "Confirm"}
                       </Button>
                       <Button onClick={cancelEndGame} variant="outline" className="flex-1" disabled={listLoading}>
                         Cancel

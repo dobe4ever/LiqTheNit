@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import { AuthForm } from "@/components/auth/auth-form"
-import { getSupabaseServerClient } from "@/lib/supabase/server"
+import { getSupabaseServerClient } from "@/app/supabase/server"
 
 export default async function AuthPage() {
   const supabase = getSupabaseServerClient()

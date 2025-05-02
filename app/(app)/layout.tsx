@@ -1,8 +1,8 @@
 import type React from "react"
 import { redirect } from "next/navigation"
 import { Navbar } from "@/components/layout/navbar"
-import { getSupabaseServerClient } from "@/lib/supabase/server"
-import { getSupabaseAdmin } from "@/lib/supabase/admin"
+import { getSupabaseServerClient } from "@/app/supabase/server"
+import { getSupabaseAdmin } from "@/app/supabase/admin"
 
 export default async function AppLayout({
   children,
@@ -31,11 +31,7 @@ export default async function AppLayout({
       ignoreDuplicates: false, // Update the row if it already exists
     },
   )
-
-  if (upsertError) {
-    console.error("Error upserting profile:", upsertError)
-  }
-
+  
   return (
     <div className="flex min-h-screen flex-col m-2">
       <div>
