@@ -29,6 +29,7 @@ Continue building your app on:
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
 
+```
 (
  echo "# Codebase Dump"
  # Add . at the start of paths if running from project root
@@ -94,3 +95,4 @@ Continue building your app on:
  done
 ) > codebase2.md
 
+```
