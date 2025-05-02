@@ -29,52 +29,68 @@ Continue building your app on:
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
 
-
-# Command to generate codebase dump:
-
-```
 (
-echo "# Codebase Dump"
-for file in \
-'app/(app)/analytics/page.tsx' \
-'app/(app)/history/page.tsx' \
-'app/(app)/layout.tsx' \
-'app/(app)/page.tsx' \
-'app/(auth)/auth/callback/route.ts' \
-'app/(auth)/auth/page.tsx' \
-app/supabase/admin.ts \
-app/supabase/client.ts \
-app/supabase/server.ts \
-app/layout.tsx \
-components/analytics/hours-chart.tsx \
-components/analytics/performance-chart.tsx \
-components/analytics/profit-chart.tsx \
-components/auth/auth-form.tsx \
-components/history/bitcoin-price-display.tsx \
-components/history/games-table.tsx \
-components/history/week-stats.tsx \
-components/layout/navbar.tsx \
-components/layout/switch-theme.tsx \
-components/start/active-games-list.tsx \
-components/start/game-form.tsx \
-components/logo-symbol.tsx \
-components/nav-user.tsx \
-components/theme-provider.tsx \
-hooks/use-mobile.tsx \
-hooks/use-toast.ts \
-lib/services/bitcoin-price.ts \
-lib/utils/date-formatter.ts \
-lib/utils/number-formatter.ts \
-lib/utils.ts \
-next.config.mjs \
-tsconfig.json
-do
-  echo -e "\n### $file"
-  echo '```ts'
-  cat "$file"
-  echo ''
-  echo '```'
-done
-) > codebase.md
+ echo "# Codebase Dump"
+ # Add . at the start of paths if running from project root
+ for file in \
+ 'src/actions/auth.ts' \
+ 'src/actions/game.ts' \
+ 'src/actions/profile.ts' \
+ 'src/app/(app)/analytics/page.tsx' \
+ 'src/app/(app)/history/page.tsx' \
+ 'src/app/(app)/layout.tsx' \
+ 'src/app/(app)/page.tsx' \
+ 'src/app/(auth)/auth/callback/route.ts' \
+ 'src/app/(auth)/auth/page.tsx' \
+ 'src/app/globals.css' \
+ 'src/app/layout.tsx' \
+ 'src/auth/client.ts' \
+ 'src/auth/server.ts' \
+ 'src/components/analytics/hours-chart.tsx' \
+ 'src/components/analytics/performance-chart.tsx' \
+ 'src/components/analytics/profit-chart.tsx' \
+ 'src/components/auth/auth-form.tsx' \
+ 'src/components/history/bitcoin-price-display.tsx' \
+ 'src/components/history/games-table.tsx' \
+ 'src/components/history/week-stats.tsx' \
+ 'src/components/layout/navbar.tsx' \
+ 'src/components/layout/switch-theme.tsx' \
+ 'src/components/logo-symbol.tsx' \
+ 'src/components/nav-user.tsx' \
+ 'src/components/start/active-games-list.tsx' \
+ 'src/components/start/game-form.tsx' \
+ 'src/components/theme-provider.tsx' \
+ 'src/hooks/use-mobile.tsx' \
+ 'src/hooks/use-toast.ts' \
+ 'src/lib/services/bitcoin-price.ts' \
+ 'src/lib/utils/date.ts' \
+ 'src/lib/utils/format.ts' \
+ 'src/lib/utils.ts' \
+ 'src/types/db.ts' \
+ 'next.config.mjs' \
+ 'eslint.config.mjs' \
+ 'components.json'
+ # Add any other root config files if needed
+ do
+   # Check if file exists before trying to cat it
+   if [ -f "$file" ]; then
+     echo -e "\n### $file"
+     # Determine language for syntax highlighting based on extension
+     lang="${file##*.}"
+     if [ "$lang" = "css" ]; then lang="css";
+     elif [ "$lang" = "mjs" ]; then lang="javascript"; # or js
+     elif [ "$lang" = "json" ]; then lang="json";
+     elif [ "$lang" = "ts" ]; then lang="ts";
+     elif [ "$lang" = "tsx" ]; then lang="tsx";
+     else lang=""; fi # Default to no language if unknown
+ 
+     echo "\`\`\`${lang}"
+     cat "$file"
+     echo ''
+     echo '\`\`\`'
+   else
+     echo -e "\n### WARNING: $file not found"
+   fi
+ done
+) > codebase2.md
 
-```
