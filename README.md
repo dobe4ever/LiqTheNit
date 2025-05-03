@@ -28,6 +28,7 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+Here's a command template to generate a codebase dump for any repo. The example below has a few dummy file path examples. Your job is to rewrite the command with custom file paths based on the given file tree provided by the user. Here's the command template:
 
 ```
 (
@@ -60,7 +61,7 @@ Continue building your app on:
      echo -e "\n### WARNING: $file not found"
    fi
  done
-) > codebase2.md
+) > codebase4.md
 
 ```
 

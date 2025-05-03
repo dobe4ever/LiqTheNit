@@ -103,12 +103,12 @@ export async function getGamesPeriod(start: string, end: string): Promise<{ data
  // <-- Create client INSIDE action
     try {
         const { data, error } = await supabase.from("games")
-            .select("id, start_stack, end_stack, start_time, end_time")
+            .select("*")
             .eq("user_id", user.id).gte("end_time", start).lte("end_time", end)
             .not("end_time", "is", null).not("end_stack", "is", null)
             .order("end_time", { ascending: true })
         if (error) throw error
-        return { data: null, error: null }
+        return { data, error: null }
     } catch (error: any) {
         return handleGameError(error, "Fetch Games for Period")
     }
