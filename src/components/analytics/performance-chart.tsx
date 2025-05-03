@@ -8,10 +8,10 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/app/supabase/client"
-import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
-import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
-import { getHoursDifference } from "@/lib/utils/date-formatter"
-import { gamesTable } from "@/app/supabase/tables"
+import { getBtcUsd } from "@/services/btc"
+import { fmtUBtc, uBtcToUsd, fmtMoney } from "@/lib/num"
+import { hrsDiff } from "@/lib/date"
+import { GamesTable } from "@/components/history/games-table"
 
 type TimeframeOption = "1D" | "7D" | "1M" | "3M" | "6M" | "1Y" | "5Y" | "ALL"
 
@@ -33,7 +33,7 @@ const timeframeConfigs: Record<TimeframeOption, TimeframeConfig> = {
 }
 
 export function PerformanceChart() {
-  const [games, setGames] = useState<gamesTable[]>([])
+  const [games, setGames] = useState<GamesTable[]>([])
   const [btcPrice, setBtcPrice] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [timeframe, setTimeframe] = useState<TimeframeOption>("7D")
@@ -54,7 +54,7 @@ export function PerformanceChart() {
       }
 
       if (game.start_time && game.end_time) {
-        const hours = getHoursDifference(game.start_time, game.end_time)
+        const hours = hrsDiff(game.start_time, game.end_time)
         totalHours += hours
       }
     })
@@ -90,7 +90,7 @@ export function PerformanceChart() {
             .not("end_time", "is", null)
             .not("end_stack", "is", null)
             .order("end_time", { ascending: true }),
-          getBitcoinPriceInUSD(),
+          getBtcUsd(),
         ])
 
         if (gamesResponse.error) throw gamesResponse.error
@@ -184,7 +184,7 @@ export function PerformanceChart() {
 
           // Calculate hours
           if (game.start_time && game.end_time) {
-            const hours = getHoursDifference(game.start_time, game.end_time)
+            const hours = hrsDiff(game.start_time, game.end_time)
             interval.hours += hours
           }
 
@@ -259,10 +259,10 @@ export function PerformanceChart() {
                 {metric === "profit" ? (
                   <>
                     <span className={totals.profit >= 0 ? "text-green-600" : "text-red-600"}>
-                      {formatUBTC(totals.profit)}
+                      {fmtUBtc(totals.profit)}
                     </span>
                     <div className="text-xs font-normal text-muted-foreground">
-                      {formatMoney(convertUBTCtoUSD(totals.profit, btcPrice))}
+                      {fmtMoney(uBtcToUsd(totals.profit, btcPrice))}
                     </div>
                   </>
                 ) : (
@@ -319,11 +319,12 @@ export function PerformanceChart() {
                   content={
                     <ChartTooltipContent
                       className="w-[150px]"
-                      formatter={(value: number) => {
+                      formatter={(value) => {
+                        const numValue = typeof value === "number" ? value : parseFloat(value as string)
                         if (activeMetric === "profit") {
-                          return [formatUBTC(value), formatMoney(convertUBTCtoUSD(value, btcPrice))]
+                          return [fmtUBtc(numValue), fmtMoney(uBtcToUsd(numValue, btcPrice))]
                         } else {
-                          return [`${value.toFixed(1)} hours`]
+                          return [`${numValue.toFixed(1)} hours`]
                         }
                       }}
                       labelFormatter={(value) => {

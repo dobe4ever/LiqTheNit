@@ -1,23 +1,21 @@
+// src/app/(app)/page.tsx (StartPage)
 import { GameForm } from "@/components/start/game-form"
-import { ActiveGamesList } from "@/components/start/active-games-list"
+import { ActiveGames } from "@/components/start/active-games"
+import { PageContainer } from "@/components/layout/page-container"
+import { PageHeader } from "@/components/layout/page-header"
 
 export default async function StartPage() {
   return (
-    // Main wrapper
-    <div className="flex flex-col pb-10 sm:flex-row justify-between gap-4 w-">
-
-      {/* Row 1: Title + subline */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Start</h1>
-        <p className="text-muted-foreground">Track your games</p>
-      </div>
+    // Use PageContainer as the outermost wrapper
+    <PageContainer>
+      {/* Row 1: PageHeader (Title + subline) */}
+      <PageHeader title="Start" subtitle="Track your games" />
 
       {/* Row 2: Game form */}
       <GameForm />
 
       {/* Row 3: Active games */}
-      <ActiveGamesList />
-
-    </div>
+      <ActiveGames />
+    </PageContainer>
   )
 }

@@ -1,7 +1,7 @@
 import * as React from 'react'; 
 type ImageProps = React.ComponentPropsWithoutRef<'img'>;
 
-export function LogoSymbol(props: ImageProps) {
+export function Logo(props: ImageProps) {
   return (
     <img
       src="/logo_symbol.png" // Path relative to the public folder

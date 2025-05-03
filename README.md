@@ -37,40 +37,7 @@ Continue building your app on:
  'src/actions/auth.ts' \
  'src/actions/game.ts' \
  'src/actions/profile.ts' \
- 'src/app/(app)/analytics/page.tsx' \
- 'src/app/(app)/history/page.tsx' \
- 'src/app/(app)/layout.tsx' \
- 'src/app/(app)/page.tsx' \
- 'src/app/(auth)/auth/callback/route.ts' \
- 'src/app/(auth)/auth/page.tsx' \
- 'src/app/globals.css' \
- 'src/app/layout.tsx' \
- 'src/auth/client.ts' \
- 'src/auth/server.ts' \
- 'src/components/analytics/hours-chart.tsx' \
- 'src/components/analytics/performance-chart.tsx' \
- 'src/components/analytics/profit-chart.tsx' \
- 'src/components/auth/auth-form.tsx' \
- 'src/components/history/bitcoin-price-display.tsx' \
- 'src/components/history/games-table.tsx' \
- 'src/components/history/week-stats.tsx' \
- 'src/components/layout/navbar.tsx' \
- 'src/components/layout/switch-theme.tsx' \
- 'src/components/logo-symbol.tsx' \
- 'src/components/nav-user.tsx' \
- 'src/components/start/active-games-list.tsx' \
- 'src/components/start/game-form.tsx' \
- 'src/components/theme-provider.tsx' \
- 'src/hooks/use-mobile.tsx' \
- 'src/hooks/use-toast.ts' \
- 'src/lib/services/bitcoin-price.ts' \
- 'src/lib/utils/date.ts' \
- 'src/lib/utils/format.ts' \
- 'src/lib/utils.ts' \
- 'src/types/db.ts' \
- 'next.config.mjs' \
- 'eslint.config.mjs' \
- 'components.json'
+ 'src/app/(app)/analytics/page.tsx' 
  # Add any other root config files if needed
  do
    # Check if file exists before trying to cat it
@@ -95,4 +62,70 @@ Continue building your app on:
  done
 ) > codebase2.md
 
+```
+
+```
+.
+├── node_modules/
+├── public/
+├── src
+│   ├── actions
+│   │   ├── auth.ts
+│   │   ├── games.ts
+│   │   └── profiles.ts
+│   ├── app
+│   │   ├── (app)
+│   │   │   ├── analytics
+│   │   │   │   └── page.tsx
+│   │   │   ├── history
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   ├── (auth)
+│   │   │   └── auth
+│   │   │       ├── callback
+│   │   │       │   └── route.ts
+│   │   │       └── page.tsx
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── supabase
+│   │       ├── admin.ts
+│   │       ├── client.ts
+│   │       └── server.ts
+│   ├── auth
+│   │   ├── client.ts
+│   │   └── server.ts
+│   ├── components
+│   │   ├── analytics
+│   │   │   ├── hours-chart.tsx
+│   │   │   ├── performance-chart.tsx
+│   │   │   └── profit-chart.tsx
+│   │   ├── auth
+│   │   │   └── auth-form.tsx
+│   │   ├── history
+│   │   │   ├── bitcoin-price-display.tsx
+│   │   │   ├── games-table.tsx
+│   │   │   └── week-stats.tsx
+│   │   ├── layout
+│   │   │   ├── nav-user.tsx
+│   │   │   ├── nav.tsx
+│   │   │   └── theme-switch.tsx
+│   │   ├── logo.tsx
+│   │   ├── start
+│   │   │   ├── active-games.tsx
+│   │   │   └── game-form.tsx
+│   │   ├── theme-provider.tsx
+│   │   └── ui/
+│   ├── hooks
+│   │   ├── use-mobile.tsx
+│   │   └── use-toast.ts
+│   ├── lib
+│   │   ├── date.ts
+│   │   ├── num.ts
+│   │   └── utils.ts
+│   ├── services
+│   │   └── btc.ts
+│   └── types
+│       └── db.ts
+└── tsconfig.json
 ```

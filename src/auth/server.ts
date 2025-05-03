@@ -1,40 +1,40 @@
-// src/auth/server.ts
-import { createServerClient, type CookieOptions } from "@supabase/ssr"
-import { cookies } from "next/headers"
-import { Database } from "@/types/db" // Import generated types
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-export function createSrvClient() {
-  const cookieStore = cookies()
-  return createServerClient<Database>( // Use Database type
+export async function createClient() {
+  const cookieStore = await cookies();
+
+  const client = createServerClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string): string | undefined {
-          return cookieStore.get(name)?.value
+        getAll() {
+          return cookieStore.getAll();
         },
-        set(name: string, value: string, options: CookieOptions) {
+        setAll(cookiesToSet) {
           try {
-            cookieStore.set({ name, value, ...options })
-          } catch (error) {}
-        },
-        remove(name: string, options: CookieOptions) {
-          try {
-            cookieStore.set({ name, value: "", ...options })
-          } catch (error) {}
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            );
+          } catch {}
         },
       },
     },
-  )
+  );
+
+  return client;
 }
 
 export async function getUser() {
-  const supabase = createSrvClient()
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    return user
-  } catch (error) {
-    console.error("Error getting user:", error)
-    return null
+  const { auth } = await createClient();
+
+  const userObject = await auth.getUser();
+
+  if (userObject.error) {
+    console.error(userObject.error);
+    return null;
   }
+
+  return userObject.data.user;
 }

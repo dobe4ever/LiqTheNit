@@ -7,12 +7,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { useToast } from "@/hooks/use-toast"
 import { getSupabaseBrowserClient } from "@/app/supabase/client"
-import { getHoursDifference } from "@/lib/utils/date-formatter"
+import { hrsDiff } from "@/lib/date"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { gamesTable } from "@/app/supabase/tables"
+import { GamesTable } from "@/components/history/games-table"
 
 export function HoursChart() {
-  const [games, setGames] = useState<gamesTable[]>([])
+  const [games, setGames] = useState<GamesTable[]>([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState("7")
   const router = useRouter()
@@ -79,7 +79,7 @@ export function HoursChart() {
     games.forEach((game) => {
       if (game.start_time && game.end_time) {
         const dateKey = game.end_time.split("T")[0]
-        const hours = getHoursDifference(game.start_time, game.end_time)
+        const hours = hrsDiff(game.start_time, game.end_time)
 
         if (datesMap.has(dateKey)) {
           const day = datesMap.get(dateKey)
@@ -147,7 +147,7 @@ export function HoursChart() {
                 <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `${value.toFixed(1)}`} />
                 <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} name="Hours Played" />
                 <ChartTooltip
-                  content={<ChartTooltipContent formatter={(value: number) => [`${value.toFixed(1)} hours`]} />}
+                  content={<ChartTooltipContent formatter={(value) => typeof value === 'number' ? `${value.toFixed(1)} hours` : value} />}
                   cursor={{ fill: "rgba(0, 0, 0, 0.1)" }}
                 />
               </BarChart>

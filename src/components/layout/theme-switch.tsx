@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { Moon, Sun } from "lucide-react"
 import { cn } from "@/lib/utils" // Make sure you have this utility or adapt
 
-export function SwitchTheme() {
+export function ThemeSwitch() {
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
 

@@ -1,15 +1,10 @@
 import { redirect } from "next/navigation"
 import { AuthForm } from "@/components/auth/auth-form"
-import { getSupabaseServerClient } from "@/app/supabase/server"
+import { getUser } from "@/auth/server" // Use centralized getter
 
 export default async function AuthPage() {
-  const supabase = getSupabaseServerClient()
-
-  const { data } = await supabase.auth.getUser()
-
-  if (data.user) {
-    redirect("/")
-  }
+  const user = await getUser()
+  if (user) redirect("/") // Redirect if already logged in
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">

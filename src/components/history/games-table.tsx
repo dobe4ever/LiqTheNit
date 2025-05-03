@@ -1,153 +1,128 @@
-// components/history/games-table.tsx
 "use client"
-
-import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback, useTransition } from "react"
 import { RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card" // Shorter names
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { formatDateTime, getHoursDifference } from "@/lib/utils/date-formatter"
-import { formatUBTC, convertUBTCtoUSD, formatMoney } from "@/lib/utils/number-formatter"
+import { fmtDt, hrsDiff } from "@/lib/date" // Use renamed utils
+import { fmtUBtc, uBtcToUsd, fmtMoney } from "@/lib/num" // Use renamed utils
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/app/supabase/client"
-import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
-import { gamesTable } from "@/app/supabase/tables"
+import { getDoneGames } from "@/actions/games" // Use action
+import { getBtcUsd } from "@/services/btc" // Use service action
+import type { Game } from "@/types/db"
+
+const PAGE_SIZE = 15 // Reduced page size
 
 export function GamesTable() {
-  const [games, setGames] = useState<gamesTable[]>([])
+  const [games, setGames] = useState<Game[]>([])
   const [btcPrice, setBtcPrice] = useState<number>(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, startLoading] = useTransition() // Use transition for loading state
   const [page, setPage] = useState(0)
-  const [totalGames, setTotalGames] = useState(0)
-  const pageSize = 25
-  const router = useRouter()
+  const [total, setTotal] = useState(0)
   const { toast } = useToast()
-  const supabase = getSupabaseBrowserClient()
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        router.push("/auth")
-        return
+  // Fetch data function
+  const fetchData = useCallback(async (pageNum = 0) => {
+    startLoading(async () => {
+      try {
+        const [gamesRes, price] = await Promise.all([
+          getDoneGames(pageNum, PAGE_SIZE),
+          getBtcUsd(),
+        ])
+
+        if (gamesRes.error) throw new Error(gamesRes.error)
+        // Auth check is implicitly done by the action
+
+        setGames(gamesRes.data || [])
+        setTotal(gamesRes.count || 0)
+        setBtcPrice(price)
+        setPage(pageNum) // Update page state after successful fetch
+      } catch (error: any) {
+        console.error("Fetch history error:", error)
+        toast({ title: "Error", description: error.message || "Failed to fetch history.", variant: "destructive" })
+        setGames([]) // Clear data on error
+        setTotal(0)
       }
+    })
+  }, [toast]) // Dependencies
 
-      // Get count of all completed games
-      const { count, error: countError } = await supabase
-        .from("games")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userData.user.id)
-        .not("end_time", "is", null)
-        .not("end_stack", "is", null)
-
-      if (countError) throw countError
-
-      setTotalGames(count || 0)
-
-      // Get current page of games
-      const [gamesResponse, priceResponse] = await Promise.all([
-        supabase
-          .from("games")
-          .select("*")
-          .eq("user_id", userData.user.id)
-          .not("end_time", "is", null)
-          .not("end_stack", "is", null)
-          .order("end_time", { ascending: false })
-          .range(page * pageSize, (page + 1) * pageSize - 1),
-        getBitcoinPriceInUSD(),
-      ])
-
-      if (gamesResponse.error) throw gamesResponse.error
-
-      setGames(gamesResponse.data || [])
-      setBtcPrice(priceResponse)
-    } 
-    catch (error: any) {
-      console.error("Error fetching games:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch games history.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }, [page, router, toast, supabase])
-  
+  // Initial fetch
   useEffect(() => {
-    fetchData()
-  }, [page, fetchData])
-  
+    fetchData(0)
+  }, [fetchData])
+
+  // --- Render Logic ---
+  const profitClass = (p: number) => (p >= 0 ? "text-green-600" : "text-red-600")
+
   return (
-    <Card>
-      <div className="flex justify-between p-2 border-b">
-      <h2 className="text-xl font-semibold">Game History</h2>
-        {/* --- Refresh Button --- */}
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+    <Card className="p-4">
+      <div className="flex justify-between items-center p- border-b">
+        <h2 className="text-xl font-semibold m-4">History</h2>
+        <Button variant="outline" size="icon" onClick={() => fetchData(page)} disabled={loading} className="h-8 w-8"> {/* Icon button */}
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           <span className="sr-only">Refresh</span>
         </Button>
       </div>
 
-      {/* Loading Skeleton or Initial Loading */}
+      {/* Loading Skeleton */}
       {loading && games.length === 0 && (
-        <div className="animate-pulse">
-          <div className="p-4">
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-12 bg-muted rounded"></div>
-              ))}
-            </div>
+        <CardContent className="p- animate-pulse">
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-muted rounded"></div>)}
           </div>
-        </div>
+        </CardContent>
       )}
 
       {/* No Games Message */}
       {!loading && games.length === 0 && (
-        <div className="p-6 text-center text-muted-foreground">
-          No game history found. Start playing to see your history here.
-        </div>
+        <CardContent className="p-6 text-center text-muted-foreground">No history found.</CardContent>
       )}
 
       {/* Games Table */}
-      {games.length > 0 && (
+      {!loading && games.length > 0 && (
         <>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Game Type</TableHead>
-                  <TableHead>Buy In</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead className="text-right">Profit/Loss</TableHead>
+                  <TableHead>End</TableHead> {/* Shortened */}
+                  <TableHead>Type</TableHead>
+                  <TableHead>BuyIn</TableHead>
+                  <TableHead>Hrs</TableHead> {/* Shortened */}
+                  <TableHead className="text-right">P/L (µ)</TableHead> {/* Shortened */}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* Map directly inside TableBody */}
-                {games.map((game) => {
-                  const profit = game.end_stack - game.start_stack
-                  const duration = getHoursDifference(game.start_time, game.end_time)
-
+                {games.map((g) => {
+                  // Ensure end_stack and start_stack are numbers before subtraction
+                  const profit = (g.end_stack ?? 0) - (g.start_stack ?? 0)
+                  // Ensure end_time is valid before calculating duration
+                  const duration = g.end_time ? hrsDiff(g.start_time, g.end_time) : 0
                   return (
-                    <TableRow key={game.id}>
-                      <TableCell>{formatDateTime(game.end_time)}</TableCell>
-                      <TableCell className="capitalize">{game.game_type}</TableCell>
-                      <TableCell>{formatUBTC(game.buy_in)}</TableCell>
-                      <TableCell>{duration.toFixed(2)} hours</TableCell>
-                      <TableCell className="text-right">
-                        <span className={profit >= 0 ? "text-green-600" : "text-red-600"}>{formatUBTC(profit)}</span>
-                        <div className="text-xs text-muted-foreground">
-                          {formatMoney(convertUBTCtoUSD(profit, btcPrice))}
-                        </div>
+                    <TableRow key={g.id}>
+                      <TableCell className="text-xs">{g.end_time ? fmtDt(g.end_time) : "-"}</TableCell> {/* Use fmtDt */}
+                      <TableCell className="capitalize text-xs">{g.game_type}</TableCell>
+                      <TableCell className="text-xs">{fmtUBtc(g.buy_in)}</TableCell>
+                      <TableCell className="text-xs">{duration.toFixed(1)}</TableCell> {/* Shorter duration */}
+                      <TableCell className="text-right text-xs">
+                        <span className={profitClass(profit)}>{fmtUBtc(profit)}</span>
+                        <div className="text-[10px] text-muted-foreground">{fmtMoney(uBtcToUsd(profit, btcPrice))}</div> {/* Smaller USD */}
                       </TableCell>
                     </TableRow>
                   )
                 })}
               </TableBody>
             </Table>
+          </div>
+          {/* Pagination (Basic Example) */}
+          <div className="flex items-center justify-between p-2 border-t">
+             <span className="text-xs text-muted-foreground">
+                Page {page + 1} of {Math.ceil(total / PAGE_SIZE)} ({total} games)
+             </span>
+             <div className="flex gap-1">
+                <Button variant="outline" size="sm" onClick={() => fetchData(page - 1)} disabled={page === 0 || loading}>Prev</Button>
+                <Button variant="outline" size="sm" onClick={() => fetchData(page + 1)} disabled={page + 1 >= Math.ceil(total / PAGE_SIZE) || loading}>Next</Button>
+             </div>
           </div>
         </>
       )}

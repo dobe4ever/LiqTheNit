@@ -1,114 +1,81 @@
-// components/history/week-stats.tsx
 "use client"
-
-import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useCallback, useTransition } from "react"
 import { RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatMoney, formatUBTC, convertUBTCtoUSD } from "@/lib/utils/number-formatter"
-import { getStartOfWeek, getHoursDifference } from "@/lib/utils/date-formatter"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card" // Shorter names
+import { fmtMoney, fmtUBtc, uBtcToUsd } from "@/lib/num" // Use renamed utils
+import { startOfWeek, hrsDiff } from "@/lib/date" // Use renamed utils
 import { useToast } from "@/hooks/use-toast"
-import { getSupabaseBrowserClient } from "@/app/supabase/client"
-import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
+import { getGamesPeriod } from "@/actions/games" // Use action
+import { getBtcUsd } from "@/services/btc" // Use service action
+import type { Game } from "@/types/db"
 
-// Define the type for the game data fetched specifically in this component
-interface WeeklyGameStats {
-  start_time: string | null
-  end_time: string | null
-  start_stack: number | null
-  end_stack: number | null
-}
+interface Stats { totalPnl: number; totalHrs: number; pnlPerHr: number }
 
 export function WeekStats() {
-  const [stats, setStats] = useState({
-    totalProfit: 0,
-    totalHours: 0,
-    profitPerHour: 0,
-  })
+  const [stats, setStats] = useState<Stats>({ totalPnl: 0, totalHrs: 0, pnlPerHr: 0 })
   const [btcPrice, setBtcPrice] = useState<number>(0)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
+  const [loading, startLoading] = useTransition()
   const { toast } = useToast()
-  const supabase = getSupabaseBrowserClient()
 
-  // --- Refactored Fetch Logic ---
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData.user) {
-        router.push("/auth")
-        return
+  // Calculate stats from games data
+  const calcStats = useCallback((games: Game[]): Stats => {
+    let totalPnl = 0
+    let totalHrs = 0
+    games.forEach((g) => {
+      if (g.end_stack !== null && g.start_stack !== null) {
+        totalPnl += g.end_stack - g.start_stack
       }
-
-      const startOfWeek = getStartOfWeek().toISOString()
-
-      const [gamesResponse, priceResponse] = await Promise.all([
-        supabase
-          .from("games")
-          .select("start_time, end_time, start_stack, end_stack") // Select only needed fields
-          .eq("user_id", userData.user.id)
-          .gte("end_time", startOfWeek) // Filter by end_time being in the current week
-          .not("end_time", "is", null)
-          .not("end_stack", "is", null),
-        getBitcoinPriceInUSD(),
-      ])
-
-      // Explicitly type the response data
-      const games: WeeklyGameStats[] = gamesResponse.data || []
-
-      if (gamesResponse.error) throw gamesResponse.error
-
-      let totalProfit = 0
-      let totalHours = 0
-
-      // Add type annotation for 'game' parameter
-      games.forEach((game: WeeklyGameStats) => {
-        // Calculate profit (end_stack - start_stack)
-        // Add null checks for safety
-        const profit = (game.end_stack ?? 0) - (game.start_stack ?? 0)
-        totalProfit += profit
-
-        // Calculate hours played using the utility function
-        if (game.start_time && game.end_time) {
-          totalHours += getHoursDifference(game.start_time, game.end_time)
-        }
-      })
-
-      const profitPerHour = totalHours > 0 ? totalProfit / totalHours : 0
-
-      setStats({
-        totalProfit,
-        totalHours: Math.round(totalHours * 100) / 100,
-        profitPerHour: Math.round(profitPerHour * 100) / 100,
-      })
-
-      setBtcPrice(priceResponse)
-    } catch (error: any) {
-      console.error("Error fetching week stats:", error)
-      toast({
-        title: "Error",
-        description: "Failed to fetch weekly statistics.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+      if (g.start_time && g.end_time) {
+        totalHrs += hrsDiff(g.start_time, g.end_time)
+      }
+    })
+    const pnlPerHr = totalHrs > 0 ? totalPnl / totalHrs : 0
+    return {
+      totalPnl,
+      totalHrs: Math.round(totalHrs * 10) / 10, // Round hours
+      pnlPerHr: Math.round(pnlPerHr), // Round P/L per hour
     }
-  }, [router, toast, supabase]) // Dependencies for useCallback
+  }, [])
 
-  // --- useEffect calls fetchData ---
+  // Fetch data function
+  const fetchData = useCallback(async () => {
+    startLoading(async () => {
+      try {
+        const start = startOfWeek().toISOString()
+        const end = new Date().toISOString() // Now
+
+        const [gamesRes, price] = await Promise.all([
+          getGamesPeriod(start, end),
+          getBtcUsd(),
+        ])
+
+        if (gamesRes.error) throw new Error(gamesRes.error)
+        // Auth check is handled by action
+
+        setStats(calcStats(gamesRes.data || []))
+        setBtcPrice(price)
+      } catch (error: any) {
+        console.error("Fetch week stats error:", error)
+        toast({ title: "Error", description: error.message || "Failed to fetch week stats.", variant: "destructive" })
+        setStats({ totalPnl: 0, totalHrs: 0, pnlPerHr: 0 }) // Reset stats on error
+      }
+    })
+  }, [toast, calcStats]) // Dependencies
+
+  // Initial fetch
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
   // --- Render Logic ---
+  const profitClass = (p: number) => (p >= 0 ? "text-green-600" : "text-red-600")
+
   return (
     <>
-      <div className="flex justify-between mb-2">
+      <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">This Week So Far</h2>
-        {/* --- Refresh Button --- */}
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+        <Button variant="outline" size="icon" onClick={fetchData} disabled={loading} className="h-8 w-8"> {/* Icon button */}
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           <span className="sr-only">Refresh</span>
         </Button>
@@ -116,16 +83,14 @@ export function WeekStats() {
 
       {/* Loading Skeleton */}
       {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
+            <Card key={i}>
               <CardHeader className="pb-2">
-                <div className="h-4 bg-muted rounded w-24 mb-2"></div>
-                <div className="h-6 bg-muted rounded w-32"></div>
+                <div className="h-4 bg-muted rounded w-20 mb-2"></div>
+                <div className="h-6 bg-muted rounded w-28"></div>
               </CardHeader>
-              <CardContent>
-                <div className="h-4 bg-muted rounded w-16"></div>
-              </CardContent>
+              <CardContent><div className="h-4 bg-muted rounded w-16"></div></CardContent>
             </Card>
           ))}
         </div>
@@ -133,46 +98,30 @@ export function WeekStats() {
 
       {/* Stats Cards */}
       {!loading && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Card 1: Profit */}
+        <div className="grid grid-cols-3 md:grid-cols-3 gap-4">
+          {/* Profit */}
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Profit</CardDescription>
-              <CardTitle className={stats.totalProfit >= 0 ? "text-green-600" : "text-red-600"}>
-                {formatUBTC(stats.totalProfit)}
-              </CardTitle>
+              <CardDescription>Profit</CardDescription>
+              <CardTitle className={profitClass(stats.totalPnl)}>{fmtUBtc(stats.totalPnl)}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {formatMoney(convertUBTCtoUSD(stats.totalProfit, btcPrice))}
-              </p>
-            </CardContent>
+            <CardContent><p className="text-xs text-muted-foreground">{fmtMoney(uBtcToUsd(stats.totalPnl, btcPrice))}</p></CardContent>
           </Card>
-
-          {/* Card 2: Hours */}
+          {/* Hours */}
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Total Hours</CardDescription>
-              <CardTitle>{stats.totalHours.toFixed(2)} hr</CardTitle>
+              <CardDescription>Hours</CardDescription>
+              <CardTitle>{stats.totalHrs.toFixed(1)} hr</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">This week</p>
-            </CardContent>
+            <CardContent><p className="text-xs text-muted-foreground">This week</p></CardContent>
           </Card>
-
-          {/* Card 3: Profit/Hour */}
+          {/* Profit/Hour */}
           <Card>
             <CardHeader className="pb-2">
-              <CardDescription>Profit Per Hour</CardDescription>
-              <CardTitle className={stats.profitPerHour >= 0 ? "text-green-600" : "text-red-600"}>
-                {formatUBTC(stats.profitPerHour)}
-              </CardTitle>
+              <CardDescription>P/L Hour</CardDescription>
+              <CardTitle className={profitClass(stats.pnlPerHr)}>{fmtUBtc(stats.pnlPerHr)}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {formatMoney(convertUBTCtoUSD(stats.profitPerHour, btcPrice))}/hr
-              </p>
-            </CardContent>
+            <CardContent><p className="text-xs text-muted-foreground">{fmtMoney(uBtcToUsd(stats.pnlPerHr, btcPrice))}/hr</p></CardContent>
           </Card>
         </div>
       )}

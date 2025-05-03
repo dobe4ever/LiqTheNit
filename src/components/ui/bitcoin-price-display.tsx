@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { formatMoney } from "@/lib/utils/number-formatter"
-import { getBitcoinPriceInUSD } from "@/lib/services/bitcoin-price"
+import { formatMoney } from "@/lib/num"
+import { getBitcoinPriceInUSD } from "@/services/btc"
 
 export function BitcoinPriceDisplay() {
   const [price, setPrice] = useState<number>(0)
